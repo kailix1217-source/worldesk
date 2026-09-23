@@ -30,6 +30,15 @@ const SCHEMA = {
 };
 
 type SearchResult = { url: string; title?: string; date?: string };
+type AgentResponse = {
+  status?: string;
+  output_text?: string;
+  output: {
+    type: string;
+    content?: { text?: string }[];
+    results?: SearchResult[];
+  }[];
+};
 
 async function search(profile: Profile, leg: Leg, count: number, recency: "week" | "month") {
   const market = marketFor(leg.country)!;
@@ -48,28 +57,48 @@ Find up to ${count} recent stories from the outlets above that this reader shoul
 For each: outlet name, the original ${market.language} headline, an accurate English translation, publication date (YYYY-MM-DD), a 2-sentence English summary that keeps the local framing and tone, and one sentence "why it matters" addressed to this reader (concrete: which conversation or decision it affects).
 landing_note: one sentence on the overall business mood in ${leg.city} this week, based only on these stories.`;
 
-  const res = await fetch("https://api.perplexity.ai/chat/completions", {
+  // Perplexity Agent API: https://docs.perplexity.ai/api-reference/agent-post
+  const res = await fetch("https://api.perplexity.ai/v1/agent", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${process.env.PERPLEXITY_API_KEY}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "sonar",
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
+      model: "openai/gpt-5.6-luna",
+      instructions: system,
+      input: user,
+      max_steps: 5,
+      tools: [
+        {
+          type: "web_search",
+          filters: {
+            search_domain_filter: market.outlets.map((o) => o.domain),
+            search_recency_filter: recency,
+          },
+        },
       ],
-      search_domain_filter: market.outlets.map((o) => o.domain),
-      search_recency_filter: recency,
-      response_format: { type: "json_schema", json_schema: { schema: SCHEMA } },
-      temperature: 0.2,
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: "briefing", schema: SCHEMA },
+      },
     }),
   });
   if (!res.ok) throw new Error(`Perplexity ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  const data = await res.json();
-  const parsed = JSON.parse(data.choices[0].message.content) as { landing_note: string; articles: Article[] };
-  const results: SearchResult[] = data.search_results ?? (data.citations ?? []).map((url: string) => ({ url }));
+  const data = (await res.json()) as AgentResponse;
+  if (data.status && data.status !== "completed") throw new Error(`Perplexity status ${data.status}`);
+
+  const text =
+    data.output_text ??
+    data.output
+      .filter((o) => o.type === "message")
+      .flatMap((o) => o.content ?? [])
+      .map((c) => c.text ?? "")
+      .join("");
+  const parsed = JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, "")) as { landing_note: string; articles: Article[] };
+  const results: SearchResult[] = data.output
+    .filter((o) => o.type === "search_results")
+    .flatMap((o) => o.results ?? []);
   return { parsed, results, market };
 }
 
