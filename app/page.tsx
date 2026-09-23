@@ -346,6 +346,65 @@ function ProfileStep({ profile, setProfile, onBack, onNext }: {
   );
 }
 
+// Market pin per country, in the order PINS was generated (see lib/worldDots.ts).
+const COUNTRY_PIN: Record<string, number> = { Germany: 0, France: 1, Japan: 2, "South Korea": 3, China: 4, Brazil: 5, Mexico: 6 };
+const PLANE = "M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z";
+
+function arc([x1, y1]: [number, number], [x2, y2]: [number, number]) {
+  const lift = Math.max(6, Math.hypot(x2 - x1, y2 - y1) * 0.28);
+  return `M${x1},${y1} Q${(x1 + x2) / 2},${Math.min(y1, y2) - lift} ${x2},${y2}`;
+}
+
+// Night-flight banner: the user's stops drawn as routes on the dotted world map, with a plane flying the first leg.
+function FlightBanner({ legs }: { legs: Leg[] }) {
+  const dots = useMemo(() => dotPath(DOTS, 0.32), []);
+  const stops = legs.filter((l) => l.country in COUNTRY_PIN);
+  const pts = stops.map((l) => PINS[COUNTRY_PIN[l.country]]);
+  const route: [number, number][] = pts.length >= 2 ? pts : [PINS[6], PINS[0], PINS[2]]; // sample route until two stops exist
+  const paths = route.slice(1).map((p, i) => arc(route[i], p)).filter((d, i) => route[i][0] !== route[i + 1][0] || route[i][1] !== route[i + 1][1]);
+  const [still] = useState(() => {
+    try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return true; }
+  });
+  const sample = pts.length < 2;
+  // Centre the view on the route so both ends survive the side crop on narrow screens.
+  const xs = route.map(([x]) => x);
+  const vbX = Math.max(-15, Math.min(15, (Math.min(...xs) + Math.max(...xs)) / 2 - 73.5));
+  const label = stops.length ? stops.map((l) => l.city).join(" → ") : "Add your first city below";
+
+  return (
+    <div className="flight-banner" aria-hidden="true">
+      <svg viewBox={`${vbX} 4 147 58`} preserveAspectRatio="xMidYMid slice">
+        <path d={dots} className="fb-dots" />
+        {paths.map((d, i) => <path key={i} d={d} className={`fb-route ${sample ? "sample" : ""}`} />)}
+        {route.map(([x, y], i) => (
+          <g key={i} className={sample ? "sample" : ""}>
+            <circle cx={x} cy={y} r="1.9" className="fb-halo" />
+            <circle cx={x} cy={y} r="0.85" className="fb-pin" />
+          </g>
+        ))}
+        {paths[0] && (
+          <g className="fb-plane">
+            {still ? (
+              <g transform={(() => { const [a, b] = [route[0], route[1]]; return `translate(${(a[0] + b[0]) / 2},${Math.min(a[1], b[1]) - Math.max(6, Math.hypot(b[0] - a[0], b[1] - a[1]) * 0.28) / 2}) rotate(90) scale(0.26) translate(-12,-12)`; })()}>
+                <path d={PLANE} />
+              </g>
+            ) : (
+              <g>
+                <g transform="rotate(90) scale(0.26) translate(-12,-12)"><path d={PLANE} /></g>
+                <animateMotion dur="7s" repeatCount="indefinite" rotate="auto" path={paths[0]} keyPoints="0;1" keyTimes="0;1" calcMode="spline" keySplines="0.45 0 0.55 1" />
+              </g>
+            )}
+          </g>
+        )}
+      </svg>
+      <div className="fb-text">
+        <div className="fb-label">{sample ? "Sample route" : "Your route"}</div>
+        <div className="fb-route-text">{label}</div>
+      </div>
+    </div>
+  );
+}
+
 function TripStep({ legs, setLegs, onBack, onNext }: {
   legs: Leg[]; setLegs: (l: Leg[]) => void; onBack: () => void; onNext: () => void;
 }) {
@@ -355,6 +414,7 @@ function TripStep({ legs, setLegs, onBack, onNext }: {
 
   return (
     <section className="step">
+      <FlightBanner legs={legs} />
       <div className="step-head">
         <div className="kicker">Step 2 of 2</div>
         <h2>Where are you headed?</h2>

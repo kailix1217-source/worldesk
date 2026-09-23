@@ -440,3 +440,17 @@ article.story[data-url] { padding: 24px 26px; margin-top: 18px; }
   display: flex; align-items: center; gap: 8px; }
 .summary-label::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--signal); box-shadow: 0 0 0 5px rgba(232, 98, 44, 0.25); }
 .summary p { margin: 12px 0 0; font-size: 19px; line-height: 1.5; color: #f3f4f6; }
+
+/* ---------- v16: night-flight banner (trip page) ---------- */
+.flight-banner { position: relative; height: clamp(170px, 32vw, 240px); border-radius: var(--radius-card); overflow: hidden;
+  background: radial-gradient(500px 260px at 70% 30%, #202228, #111214); margin: 18px 0 28px; box-shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.5); }
+.flight-banner svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.fb-dots { fill: #3f4552; }
+.fb-route { fill: none; stroke: var(--signal); stroke-width: 0.45; stroke-dasharray: 1.2 1; stroke-linecap: round; }
+.fb-route.sample, .sample .fb-pin { opacity: 0.55; }
+.fb-pin { fill: var(--signal); } .fb-halo { fill: var(--signal); opacity: 0.2; }
+.fb-plane path { fill: #ffffff; }
+.fb-text { position: absolute; left: 22px; bottom: 18px; right: 22px; }
+.fb-label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: #ff8a5c; }
+.fb-route-text { font-family: var(--sans); font-weight: 600; font-size: clamp(20px, 4.4vw, 28px); letter-spacing: -0.02em; color: #fff; margin-top: 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
