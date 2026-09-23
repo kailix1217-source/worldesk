@@ -1,16 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Newsreader } from "next/font/google";
+import { Merriweather, Outfit } from "next/font/google";
 import "./globals.css";
 
-const serif = Newsreader({ subsets: ["latin"], variable: "--font-serif", style: ["normal", "italic"] });
-const sans = Inter({ subsets: ["latin"], variable: "--font-sans" });
+const serif = Merriweather({ subsets: ["latin"], variable: "--font-serif", weight: ["400", "700"], style: ["normal", "italic"] });
+const sans = Outfit({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: "Worldesk",
   description: "Local news from trusted local papers, briefed for where your trip goes next.",
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#F6F3ED" };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#E8ECEF" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
