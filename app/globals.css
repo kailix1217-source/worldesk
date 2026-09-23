@@ -454,3 +454,8 @@ article.story[data-url] { padding: 24px 26px; margin-top: 18px; }
 .fb-label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: #ff8a5c; }
 .fb-route-text { font-family: var(--sans); font-weight: 600; font-size: clamp(20px, 4.4vw, 28px); letter-spacing: -0.02em; color: #fff; margin-top: 4px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- v17: selected topics on the profile page are orange ---------- */
+.step .chips .chip.on { background: var(--signal); border-color: var(--signal); color: var(--ink); font-weight: 600; }
+.step .chips .chip.on::before { content: "✓"; margin-right: 6px; }
+.step .chips .chip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }

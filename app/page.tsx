@@ -334,7 +334,7 @@ function ProfileStep({ profile, setProfile, onBack, onNext }: {
       <div className="field"><span className="label">Topics to follow</span>
         <div className="chips">
           {TOPICS.map((t) => (
-            <button key={t} className={`chip ${profile.topics.includes(t) ? "on" : ""}`} onClick={() => toggle(t)}>{t}</button>
+            <button key={t} aria-pressed={profile.topics.includes(t)} className={`chip ${profile.topics.includes(t) ? "on" : ""}`} onClick={() => toggle(t)}>{t}</button>
           ))}
         </div>
       </div>
