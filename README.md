@@ -1,5 +1,7 @@
 # Worldesk: prototype
 
+**Live:** https://worldesk.vercel.app (tap "See a sample executive" for the demo)
+
 A personal news briefing for international business travelers. It covers local business news from a fixed list of trusted local papers, searched in the local language, filtered to the reader's industry and role, and weighted by where their trip goes next.
 
 ## Run locally

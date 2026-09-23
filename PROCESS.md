@@ -1,6 +1,8 @@
 # Worldesk prototype: process documentation
 Kailin Xu · MOR-531 Applied Product Management · Individual prototype
 
+**Prototype link:** https://worldesk.vercel.app (live; tap "See a sample executive" for the Munich → Tokyo demo)
+
 ## Tool
 **Claude Code** (an AI coding agent), used in two roles: first as an AI product manager to narrow the scope, then as the engineer that wrote, ran and tested the code. The live news search uses the **Perplexity Agent API** (`web_search` tool limited to approved outlets).
 
@@ -84,6 +86,7 @@ Fix six problems while keeping trust rules, design system and API:
 | v14 | Feedback: the briefing was all grey/white and tiring to scan. Story cards became white with a clearer shadow, titles grew (24px, lead 30px), and #E8622C now appears only in fixed places: the "Why it matters to you" callout (orange tint + bar), NEW markers, the next stop, and loading progress. Small orange text uses #B8461A so it passes 4.5:1 | Give the eye anchors; make "relevant to me" and "new" findable at a glance |
 | v15 | Feedback: put the design-system cover on the profile page and highlight the briefing summary. Added a brand banner (wordmark + real dotted-map tiles with market pins, sized so shapes never overlap the name) above the profile form; the "this week in <city>" summary became a dark ink panel, the page's strongest block | A branded moment during setup; the one-sentence takeaway should be read first |
 | v16 | Feedback: add a plane motif above the trip form. Added a dark "night flight" banner: the dotted world map with the user's stops drawn live as orange dashed routes, a plane flying the first leg (static for reduced-motion users), and "YOUR ROUTE · Munich → Tokyo". The view centres on the route so both ends stay visible on phones | The trip step should feel like planning a journey, and reflect the input as it's typed |
+| v17 | Selected profile topics turn orange (#E8622C, dark text for contrast, with a ✓). Merged the design branch into main and deployed to Vercel; the API key is stored as a Vercel secret, never in the code or uploads | Ship a public link for the class |
 
 ## 5. How "itinerary-aware" works (the logic)
 - The stop you're in, or the next upcoming one, gets a **full briefing (6 stories)**.
