@@ -146,16 +146,16 @@ function Welcome({ returning, name, onStart, onOpen, onEdit, onDemo }: {
       <WorldCarousel />
       <p className="ld-caption ld-mono" aria-hidden="true">READING THE WORLD&apos;S LOCAL PRESS…</p>
       <header className="ld-top">
-        <span className="ld-mono">WORLDESK // {MARKETS.length} MARKETS ONLINE</span>
+        <span />
         <span className="ld-mono ld-muted">V0.1 PROTOTYPE</span>
       </header>
 
       <div className="ld-spacer" />
 
       <main className="ld-card">
-        <span className="ld-pill-tag">{returning ? `WELCOME BACK, ${name.toUpperCase()}` : "WORLDESK.BRIEFING"}</span>
+        <span className="ld-brand">WORLDESK</span>
         <h1 className="ld-title">Know the market before you land.</h1>
-        <p className="ld-sub">Local business press, read in the local language and briefed in English for your role and your trip.</p>
+        <p className="ld-sub">{returning && <b className="ld-welcome">Welcome back, {name}. </b>}Local business press, read in the local language and briefed in English for your role and your trip.</p>
 
         <div className="ld-divider"><span>HOW IT WORKS</span></div>
 

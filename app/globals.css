@@ -229,7 +229,8 @@ article.story[data-url] { background: var(--card); border: 1px solid var(--rule)
 
 
 .ld-card { background: var(--ld-card); border-radius: 48px; padding: clamp(28px, 4vw, 48px); box-shadow: 0 30px 80px -40px rgba(30, 40, 60, 0.25); position: relative; z-index: 1; }
-.ld-pill-tag { display: inline-block; font-family: var(--font-mono), monospace; font-size: 12px; letter-spacing: 0.16em; background: var(--ld-fill); border-radius: 999px; padding: 7px 14px; }
+.ld-brand { display: inline-block; font-family: var(--font-grotesk), var(--sans); font-weight: 700; font-size: 15px; letter-spacing: 0.24em; background: var(--ld-ink); color: #fff; border-radius: 999px; padding: 9px 18px 9px 20px; }
+.ld-welcome { color: var(--ld-ink); font-weight: 600; }
 .ld-title { font-family: var(--font-grotesk), var(--sans); font-weight: 600; font-size: clamp(32px, 4.2vw, 46px); line-height: 1.05; letter-spacing: -0.02em; margin: 18px 0 10px; }
 .ld-sub { color: #6c6f76; font-size: 16px; line-height: 1.5; margin: 0; }
 
