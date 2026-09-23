@@ -44,6 +44,20 @@ Constraints: mobile-first, no new dependencies, no login or database. Verify wit
 
 **The reminder design, and why:** reminders get more frequent as the trip gets closer, which extends our "itinerary-aware" pillar. Executives dislike notification noise, so the default is one digest, and breaking alerts are opt-in and limited to their own topics.
 
+### Feedback round 3 (testing the briefing)
+My feedback (in Chinese, summarized): the local-language headline duplicates the English one; the 40–60 s wait causes anxiety (I suggested a progress bar or a clock-style ring with a percentage); topics I never picked (e.g. Labor) still appear, and tapping Labor spun for 2 minutes without results; the "briefing rhythm" panel is confusing: it should be a feature, not something to read; drop email and use push only, with the story readable inside the notification; and I didn't understand the 4 little bars under each city.
+
+Structured prompt given to the AI:
+```
+Fix six problems while keeping trust rules, design system and API:
+1. Show only the English headline (trust = outlet + "Source verified" + "Read the original" link).
+2. Replace the skeleton with an honest progress ring + percentage (estimated from typical duration, capped at 95% until results arrive) and step labels tied to what the system is doing; preload the user's topics in the background; 100 s timeout with retry.
+3. Only show topics the user chose; track loading per city AND per topic so one request never blocks another.
+4. Remove the visible rhythm panel; replace it with one alert card ("Get this briefing on your phone" → Turn on alerts); cadence stays backend behavior.
+5. Push only, no email. Notification = "<City> · in N days" + "<Outlet>: <headline>" + why it matters; tapping opens that city and scrolls to the story. Settings: daily time, breaking alerts on my topics. Turning alerts on sends a real sample notification.
+6. Replace the unexplained 4-bar depth meter with a plain label ("Full briefing" / "Preview").
+```
+
 ## 3. Key design decisions for trustworthiness
 1. **A fixed list of approved outlets for each market** (`lib/sources.ts`), e.g. Germany: Handelsblatt, FAZ, Süddeutsche, Automobilwoche; Japan: Nikkei, NHK, Asahi. The AI search is technically limited to these domains (`search_domain_filter`).
 2. **Search in the local language** (German, Japanese…), then translate and summarize in English.
@@ -62,6 +76,8 @@ Constraints: mobile-first, no new dependencies, no login or database. Verify wit
 | v6 | Blocked English editions in code (NHK World, Nikkei Asia, `/en/` pages); required search queries in the local language and at least half of stories on the user's industry; added Nikkan Kogyo Shimbun and Toyo Keizai. Tokyo now returns 6 Japanese-language automotive stories, all verified | "Local sources" has to mean local-language reporting, not just local domains |
 | v7 | Feedback round 2: landing page first (with "Welcome back" for returning users), category tags on every story, filter chips with a 5-story deep-dive per category, "Load more", "New since last visit" badges, an itinerary-aware briefing rhythm and alert settings with a real test notification | After reading 6 stories there was nothing left to do and no reason to come back |
 | v8 | Bug from testing v7: choosing a category showed no new stories. The AI kept returning stories already shown, which my code dropped as duplicates. Fix: ask for 4 extra candidates, search the past month for category deep-dives, and show a clear "no new stories" message instead of failing silently. Regulation & Policy then returned 5 new stories, including a German ban on certain environmental claims in advertising | Found by testing the filter live |
+| v9 | Feedback round 3: English headline only; progress ring with honest % and live step labels; only the user's own topics as filters, preloaded in the background; loading tracked per city and per topic (fixes Labor spinning forever); rhythm panel replaced by one "Turn on alerts" card; push-only alerts whose notification carries the story and jumps to it on tap; depth bars replaced by "Full briefing / Preview" labels | Testing showed duplication, waiting anxiety, and UI that needed explaining |
+| v10 | **Speed.** Testing v9 showed searches taking 50–100 s when several ran in parallel, and a duplicate-request bug caused a false "took too long" error. Measured search depth: 5 rounds ≈ 50–100 s, 1 round ≈ 20–30 s with the same quality (5–6 verified, relevant stories per city). Switched to 1 round, retimed the progress ring to "20–40 s", added a guard against duplicate requests, and raised the server time limit for deployment | Fixing the wait itself beats decorating it |
 
 ## 5. How "itinerary-aware" works (the logic)
 - The stop you're in, or the next upcoming one, gets a **full briefing (6 stories)**.

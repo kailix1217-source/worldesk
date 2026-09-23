@@ -170,3 +170,22 @@ button.tag:hover { background: var(--accent-soft); }
 .alerts { border-top: 1px solid var(--rule); margin-top: 14px; padding-top: 14px; }
 .check { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; }
 .check input { margin-top: 3px; accent-color: var(--accent); }
+
+/* v9: depth label, alert card, progress */
+.stop .depth { display: block; font-size: 11px; color: var(--muted); margin-top: 6px; }
+.stop.next .depth, .stop.now .depth { color: var(--accent); font-weight: 600; }
+.alert-card { background: var(--card); border: 1px solid var(--rule); padding: 12px 14px; margin-top: 16px; }
+.alert-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.alert-row b { font-size: 14px; }
+.spin { display: inline-block; width: 10px; height: 10px; margin-left: 6px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: rot 0.8s linear infinite; vertical-align: -1px; opacity: 0.7; }
+@keyframes rot { to { transform: rotate(360deg); } }
+.progress { display: flex; gap: 16px; align-items: flex-start; padding: 24px 0; }
+.progress svg { flex: 0 0 auto; }
+.progress-title { font-family: var(--serif); font-size: 19px; font-weight: 600; }
+.progress-steps { list-style: none; padding: 0; margin: 8px 0; font-size: 14px; }
+.progress-steps li { color: var(--muted); opacity: 0.55; padding: 2px 0; }
+.progress-steps li.done { opacity: 1; color: var(--accent); }
+.progress-steps li.on { opacity: 1; color: var(--ink); font-weight: 600; }
+.progress.compact { display: block; padding: 8px 0; }
+.progress .bar { height: 4px; background: var(--rule); margin-bottom: 8px; }
+.progress .bar i { display: block; height: 100%; background: var(--accent); transition: width 0.25s linear; }

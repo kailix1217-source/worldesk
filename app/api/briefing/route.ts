@@ -3,7 +3,7 @@ import { isEnglishEdition, marketFor, outletForUrl } from "@/lib/sources";
 import { sampleBriefing } from "@/lib/sample";
 import { TOPICS, type Article, type Briefing, type Leg, type Profile } from "@/lib/types";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const SCHEMA = {
   type: "object",
@@ -44,7 +44,7 @@ type AgentResponse = {
 type Req = { profile: Profile; leg: Leg; count: number; topic?: string; exclude: string[] };
 
 async function search({ profile, leg, count: wanted, topic, exclude }: Req, recency: "week" | "month") {
-  const count = exclude.length ? wanted + 4 : wanted;
+  const count = exclude.length ? wanted + 2 : wanted;
   const market = marketFor(leg.country)!;
   const outlets = market.outlets.map((o) => `${o.name} (${o.domain})`).join(", ");
 
@@ -79,7 +79,8 @@ landing_note: one sentence on the overall business mood in ${leg.city} this week
       model: "openai/gpt-5.6-luna",
       instructions: system,
       input: user,
-      max_steps: 5,
+      // 1 search round: ~20-30s vs 50-100s at 5 rounds, with similar story quality in testing
+      max_steps: Number(process.env.BRIEF_STEPS ?? 1),
       tools: [
         {
           type: "web_search",
