@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { marketFor, outletForUrl } from "@/lib/sources";
+import { isEnglishEdition, marketFor, outletForUrl } from "@/lib/sources";
 import { sampleBriefing } from "@/lib/sample";
 import type { Article, Briefing, Leg, Profile } from "@/lib/types";
 
@@ -46,8 +46,8 @@ async function search(profile: Profile, leg: Leg, count: number, recency: "week"
 
   const system = `You are the foreign desk editor of Worldesk, a briefing service for international business executives.
 You ONLY use articles published by these trusted ${market.country} outlets: ${outlets}.
-Search in ${market.language}, the way a local reader would. Never invent articles, headlines or URLs: every url must be the exact article URL from your search results.
-Prefer business, policy and industry news over general news. Skip opinion pieces, horoscopes, sports and celebrity news.`;
+Write every search query in ${market.language}, the way a local reader would, and use only ${market.language}-language articles. Never use English-language editions (e.g. NHK World, Nikkei Asia, "/en/" pages). Never invent articles, headlines or URLs: every url must be the exact article URL from your search results.
+At least half of the stories must be directly about the reader's industry; the rest may be the local economy or policy that affects it. If you do not have the exact original headline, return an empty string for original_headline rather than a placeholder. Skip opinion pieces, horoscopes, sports and celebrity news.`;
 
   const user = `Reader: ${profile.title || "executive"} in ${profile.func} at a ${profile.industry} company, based in ${profile.homeCountry || "abroad"}.
 Topics they follow: ${profile.topics.join(", ") || "markets and economy"}.
@@ -109,6 +109,7 @@ function clean(parsed: { articles: Article[] }, results: SearchResult[], market:
   for (const a of parsed.articles ?? []) {
     const outlet = outletForUrl(a.url, market);
     if (!outlet) continue; // trust rule: only whitelisted domains
+    if (isEnglishEdition(a.url)) continue; // local-language rule
     const key = a.url.replace(/\/$/, "");
     if (seen.has(key)) continue;
     seen.add(key);

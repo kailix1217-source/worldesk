@@ -32,7 +32,7 @@ The AI read our group report and gave feedback:
 ## 3. Key design decisions for trustworthiness
 1. **A fixed list of approved outlets for each market** (`lib/sources.ts`), e.g. Germany: Handelsblatt, FAZ, Süddeutsche, Automobilwoche; Japan: Nikkei, NHK, Asahi. The AI search is technically limited to these domains (`search_domain_filter`).
 2. **Search in the local language** (German, Japanese…), then translate and summarize in English.
-3. **A second check in code:** any story whose URL isn't from an approved outlet is dropped, even if the AI returned it. Stories found in the search engine's actual results get a "✓ Source verified" label.
+3. **A second check in code:** any story whose URL isn't from an approved outlet, or that comes from an English-language edition, is dropped, even if the AI returned it. Stories found in the search engine's actual results get a "✓ Source verified" label.
 4. **Every card shows** the outlet, the date, the original-language headline and a link to the original article.
 
 ## 4. Iterations
@@ -42,8 +42,9 @@ The AI read our group report and gave feedback:
 | v1 | Scope cut to 4 screens: welcome, profile, trip, briefing | Report had too many features for one night |
 | v2 | Built the app with sample data; tested on phone size | Check the flow and look before connecting live data |
 | v3 | Fixed dates showing one day late (UTC vs. local time) and the wordmark reading "Worlddesk" | Found by testing in the browser |
-| v4 | Connected live Perplexity search, restricted to approved domains | The core claim has to be real |
-| _v5_ | _add what you change after testing live results_ | |
+| v4 | Connected live search using the Perplexity **Agent API** (`/v1/agent`, `web_search` tool limited to approved domains, results returned as structured JSON), replacing the one-shot `sonar` call | The core claim has to be real; the Agent API can search several times before answering |
+| v5 | Live test: Munich returned 6 German automotive stories, all verified. **Tokyo failed**: all 3 stories came from NHK World (English) and none were about autos | Found by testing with a real persona |
+| v6 | Blocked English editions in code (NHK World, Nikkei Asia, `/en/` pages); required search queries in the local language and at least half of stories on the user's industry; added Nikkan Kogyo Shimbun and Toyo Keizai. Tokyo now returns 6 Japanese-language automotive stories, all verified | "Local sources" has to mean local-language reporting, not just local domains |
 
 ## 5. How "itinerary-aware" works (the logic)
 - The stop you're in, or the next upcoming one, gets a **full briefing (6 stories)**.

@@ -30,6 +30,8 @@ export const MARKETS: Market[] = [
       { name: "Nikkei", domain: "nikkei.com", note: "Leading business daily" },
       { name: "NHK", domain: "nhk.or.jp", note: "Public broadcaster" },
       { name: "Asahi Shimbun", domain: "asahi.com", note: "National daily" },
+      { name: "Nikkan Kogyo Shimbun", domain: "nikkan.co.jp", note: "Industry and manufacturing daily" },
+      { name: "Toyo Keizai", domain: "toyokeizai.net", note: "Business weekly" },
     ],
   },
   {
@@ -87,6 +89,20 @@ export const CITIES = MARKETS.flatMap((m) => m.cities.map((city) => ({ city, cou
 
 export function marketFor(country: string): Market | undefined {
   return MARKETS.find((m) => m.country === country);
+}
+
+// English-language editions hosted on otherwise local domains. The product promise
+// is local-language reporting, so these are rejected even though the domain is trusted.
+const ENGLISH_EDITIONS = [/^(en|english)\./, /^asia\.nikkei\.com$/, /^www\.caixinglobal\.com$/];
+const ENGLISH_PATHS = [/\/nhkworld\//, /\/english\//, /\/en\//];
+
+export function isEnglishEdition(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return ENGLISH_EDITIONS.some((r) => r.test(u.hostname)) || ENGLISH_PATHS.some((r) => r.test(u.pathname));
+  } catch {
+    return true;
+  }
 }
 
 export function outletForUrl(url: string, market: Market): Outlet | undefined {
