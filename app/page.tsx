@@ -84,6 +84,16 @@ export default function Home() {
   if (!ready) return null;
   const returning = !!(profile.industry && legs.length && legs.every((l) => l.city && l.arrive && l.depart));
 
+  if (step === "welcome") {
+    return (
+      <Welcome
+        returning={returning} name={profile.name}
+        onStart={() => setStep("profile")} onOpen={() => setStep("briefing")}
+        onEdit={() => setStep("profile")} onDemo={startDemo}
+      />
+    );
+  }
+
   return (
     <main className="wrap">
       <header className="mast">
@@ -102,13 +112,6 @@ export default function Home() {
         </div>
       </header>
 
-      {step === "welcome" && (
-        <Welcome
-          returning={returning} name={profile.name}
-          onStart={() => setStep("profile")} onOpen={() => setStep("briefing")}
-          onEdit={() => setStep("profile")} onDemo={startDemo}
-        />
-      )}
       {step === "profile" && (
         <ProfileStep profile={profile} setProfile={setProfile} onBack={() => setStep("welcome")} onNext={() => setStep("trip")} />
       )}
@@ -124,66 +127,72 @@ function Welcome({ returning, name, onStart, onOpen, onEdit, onDemo }: {
   returning: boolean; name: string; onStart: () => void; onOpen: () => void; onEdit: () => void; onDemo: () => void;
 }) {
   return (
-    <>
-      <section className="hero">
-        <div className="kicker">{returning ? `Welcome back, ${name}` : "For executives who cross borders"}</div>
-        <h1 className="display" style={{ marginTop: 10 }}>Know the market before you land.</h1>
-        <p className="lede">
-          Worldesk reads the local business press in the local language: Handelsblatt in Munich, Nikkei in Tokyo,
-          Valor in São Paulo. It briefs you in English on what matters to your industry, timed to your itinerary.
-        </p>
-        <div className="row">
-          {returning ? (
-            <>
-              <button className="btn" onClick={onOpen}>Open my briefing</button>
-              <button className="btn ghost" onClick={onEdit}>Edit profile</button>
-            </>
-          ) : (
-            <>
-              <button className="btn" onClick={onStart}>Set up my briefing</button>
-              <button className="btn ghost" onClick={onDemo}>See a sample executive</button>
-            </>
-          )}
+    <div className="ld">
+      <header className="ld-top">
+        <span className="ld-mono">WORLDESK // {MARKETS.length} MARKETS ONLINE</span>
+        <span className="ld-mono ld-muted">V0.1 PROTOTYPE</span>
+      </header>
+
+      <div className="ld-art" aria-hidden="true">
+        <svg viewBox="0 0 600 600">
+          <defs>
+            <linearGradient id="ldRing" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stopColor="#eef2f7" />
+              <stop offset="0.45" stopColor="#a9b6c8" />
+              <stop offset="1" stopColor="#dfe5ee" />
+            </linearGradient>
+            <filter id="ldBlur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="16" /></filter>
+            <filter id="ldSoft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="5" /></filter>
+          </defs>
+          <g className="ld-spin">
+            <path d="M300,80 C430,66 528,168 532,286 C536,404 468,522 336,532 C214,541 86,472 72,338 C58,206 172,94 300,80 Z"
+              fill="none" stroke="url(#ldRing)" strokeWidth="70" filter="url(#ldBlur)" />
+            <path d="M300,96 C418,86 506,176 512,288 C516,396 454,504 338,514 C226,522 104,460 92,338 C80,216 184,108 300,96 Z"
+              fill="none" stroke="#ffffff" strokeOpacity="0.9" strokeWidth="10" filter="url(#ldSoft)" />
+          </g>
+        </svg>
+      </div>
+
+      <main className="ld-card">
+        <span className="ld-pill-tag">{returning ? `WELCOME BACK, ${name.toUpperCase()}` : "WORLDESK.BRIEFING"}</span>
+        <h1 className="ld-title">Know the market before you land.</h1>
+        <p className="ld-sub">Local business press, read in the local language and briefed in English for your role and your trip.</p>
+
+        <div className="ld-markets">
+          {[["MUC", "Handelsblatt"], ["TYO", "Nikkei"], ["SAO", "Valor"]].map(([code, paper]) => (
+            <div key={code} className="ld-market"><b>{code}</b><span>{paper}</span></div>
+          ))}
         </div>
-        {returning && <button className="btn link small" onClick={onDemo}>Or view the sample executive</button>}
-      </section>
 
-      <section className="pillars">
-        <div><div className="kicker">01</div><h3>Local sources only</h3><p>A vetted list of respected papers in each market. Every story links to the original.</p></div>
-        <div><div className="kicker">02</div><h3>Filtered to your job</h3><p>Your industry and role decide what makes the cut, and why it matters to you.</p></div>
-        <div><div className="kicker">03</div><h3>Follows your trip</h3><p>Briefings get more frequent as each stop gets closer, from weekly to every morning.</p></div>
-      </section>
+        <div className="ld-divider"><span>HOW IT WORKS</span></div>
 
-      <section className="how">
-        <div className="kicker">How it works</div>
-        <ol>
-          <li><b>Tell us your role.</b> Industry, function and the topics you track. Two minutes, no login.</li>
-          <li><b>Add your trip.</b> Each city and your dates. We pick that market&apos;s trusted local papers.</li>
-          <li><b>Get your briefing.</b> Local-language reporting, translated and ranked for you, refreshed daily until you land.</li>
+        <ol className="ld-steps">
+          <li><span className="ld-mono">01</span>Tell us your industry, role and topics</li>
+          <li><span className="ld-mono">02</span>Add the cities on your trip</li>
+          <li><span className="ld-mono">03</span>Get local news, ranked for you, daily until you land</li>
         </ol>
-      </section>
 
-      <section className="example">
-        <div className="kicker">What a story looks like</div>
-        <article className="story example-card">
-          <div className="story-meta">
-            <span className="tag">Competitors</span>
-            <span className="outlet">Handelsblatt</span>
-            <span className="verified">✓ Source verified</span>
-          </div>
-          <h3>Mercedes is considering moving production out of Germany</h3>
-          <div className="why"><b>Why it matters to you</b>Expect questions on &quot;Made in Germany&quot; brand claims and labor
-            relations in any Munich meeting with automotive partners.</div>
-        </article>
-      </section>
+        {returning ? (
+          <>
+            <button className="ld-cta" onClick={onOpen}>OPEN MY BRIEFING <span aria-hidden="true">→</span></button>
+            <div className="ld-links">
+              <button onClick={onEdit}>Edit profile</button>
+              <button onClick={onDemo}>View sample executive</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <button className="ld-cta" onClick={onStart}>SET UP MY BRIEFING <span aria-hidden="true">→</span></button>
+            <div className="ld-links">
+              <button onClick={onDemo}>See a sample executive</button>
+            </div>
+          </>
+        )}
+      </main>
 
-      {!returning && (
-        <section className="cta-end">
-          <h2>Your next trip, briefed by the local press.</h2>
-          <button className="btn" onClick={onStart}>Set up my briefing</button>
-        </section>
-      )}
-    </>
+      <span className="ld-side ld-mono" aria-hidden="true">LOCAL · LANGUAGE · SOURCES</span>
+      <footer className="ld-bottom ld-mono">BRIEFING_READY<span className="ld-cursor">_</span></footer>
+    </div>
   );
 }
 
