@@ -2,7 +2,7 @@
 Kailin Xu · MOR-531 Applied Product Management · Individual prototype
 
 ## Tool
-**Claude Code** (an AI coding agent), used in two roles: first as an AI product manager to narrow the scope, then as the engineer that wrote, ran and tested the code. The live news search uses the **Perplexity API** (`sonar` model).
+**Claude Code** (an AI coding agent), used in two roles: first as an AI product manager to narrow the scope, then as the engineer that wrote, ran and tested the code. The live news search uses the **Perplexity Agent API** (`web_search` tool limited to approved outlets).
 
 ## 1. Narrowing the scope (conversation with the AI as PM)
 **My opening prompt:**
