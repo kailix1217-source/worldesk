@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   description: "Local news from trusted local papers, briefed for where your trip goes next.",
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#E8ECEF" };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#FFFFFF" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

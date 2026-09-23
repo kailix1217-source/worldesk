@@ -1,6 +1,6 @@
 :root {
   /* tweakcn theme (cmlk6zefr000004lbe9jygsqc) mapped onto Worldesk's tokens */
-  --paper: oklch(0.9383 0.0042 236.4993);      /* background */
+  --paper: oklch(1 0 0);                       /* white page background (theme default was blue-grey) */
   --card: oklch(1 0 0);                        /* card */
   --ink: oklch(0.3211 0 0);                    /* foreground */
   --ink-2: oklch(0.40 0.01 260);
