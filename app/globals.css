@@ -388,3 +388,34 @@ button.tag:hover { background: #d9dade; }
 .filters { border-top: 0; }
 .banner { border-radius: 18px; }
 .foot { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; border-top: 1px solid var(--rule); }
+
+/* ---------- v14: stronger reading contrast + fixed orange accents ---------- */
+:root { --signal: #e8622c; --signal-text: #b8461a; --signal-tint: #fff3ec; --paper-card: #ffffff; --card-line: #e3e5ea; }
+
+/* Cards lift off the grey ground: white, hairline edge, clearer shadow */
+.leg, .alert-card, .timeline, article.story[data-url] { background: var(--paper-card); border: 1px solid var(--card-line); box-shadow: 0 12px 32px -20px rgba(20, 30, 50, 0.28); }
+article.story[data-url] { padding: 24px 26px; margin-top: 18px; }
+.story h3 { font-size: 24px; line-height: 1.2; }
+.story.lead h3 { font-size: 30px; }
+.story p.sum { font-size: 15.5px; line-height: 1.6; }
+
+/* Fixed place #1: "Why it matters to you" is an orange-tinted callout */
+.why { background: var(--signal-tint); border-radius: 14px; box-shadow: inset 3px 0 0 var(--signal); padding: 14px 18px; color: var(--ink); }
+.why b { color: var(--signal-text); font-weight: 700; }
+
+/* Fixed place #2: what's new */
+.new { background: transparent; color: var(--signal-text); padding: 0; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+.new::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--signal); }
+.new-count { color: var(--signal-text); }
+
+/* Fixed place #3: where you're headed next */
+.stage.next { color: var(--signal-text); }
+.stop.sel::after { background: var(--signal); }
+.landing { border-left-color: var(--signal); }
+
+/* Fixed place #4: progress while stories load */
+.progress svg circle + circle { stroke: var(--signal); }
+.progress .bar i { background: var(--signal); }
+.progress-steps li.done { color: var(--signal-text); }
+
+.read:hover { color: var(--signal-text); }
