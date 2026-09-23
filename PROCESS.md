@@ -2,6 +2,7 @@
 Kailin Xu · MOR-531 Applied Product Management · Individual prototype
 
 **Prototype link:** https://worldesk.vercel.app (live; tap "See a sample executive" for the Munich → Tokyo demo)
+**Code:** https://github.com/kailix1217-source/worldesk
 
 ## Tool
 **Claude Code** (an AI coding agent), used in two roles: first as an AI product manager to narrow the scope, then as the engineer that wrote, ran and tested the code. The live news search uses the **Perplexity Agent API** (`web_search` tool limited to approved outlets).
