@@ -3,11 +3,11 @@ import { marketFor } from "./sources";
 
 // Placeholder content shown only when no API key is configured. It is labelled
 // "Sample" in the UI and links to outlet home pages, never to invented articles.
-export function sampleBriefing(profile: Profile, leg: Leg, count: number): Briefing {
+export function sampleBriefing(profile: Profile, leg: Leg, count: number, topic?: string): Briefing {
   const market = marketFor(leg.country);
   const outlets = market?.outlets ?? [];
   const industry = profile.industry || "your industry";
-  const topics = profile.topics.length ? profile.topics : ["Markets & Economy"];
+  const topics = topic ? [topic] : profile.topics.length ? profile.topics : ["Markets & Economy"];
   const articles = Array.from({ length: Math.min(count, 6) }, (_, i) => {
     const o = outlets[i % Math.max(outlets.length, 1)];
     const topic = topics[i % topics.length];
@@ -19,7 +19,8 @@ export function sampleBriefing(profile: Profile, leg: Leg, count: number): Brief
       summary:
         "This is placeholder text. Add a Perplexity API key to load live stories from trusted local outlets.",
       why_it_matters: `Would explain the relevance to a ${profile.func || "professional"} in ${industry}.`,
-      url: o ? `https://${o.domain}` : "#",
+      url: o ? `https://${o.domain}/?sample=${i}` : "#",
+      category: topic,
       verified: false,
     };
   });

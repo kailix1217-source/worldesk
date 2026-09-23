@@ -29,6 +29,21 @@ The AI read our group report and gave feedback:
 
 > "I don't want to exactly copy WSJ UI. Can I just use Claude Code to develop the prototype? For industry, let's go with your decision."
 
+### Feedback round 2 (after using the live prototype)
+My raw feedback (in Chinese, summarized): the app should open on a landing page that leads into the profile; the briefing is a dead end: after reading ~6 stories an executive with 15 days until the trip has no reason to explore further or come back. I want category tags on each story, filters to dig into one category (e.g. only Markets & Economy, 5 more stories), and some kind of reminder, but I wasn't sure how reminders should work.
+
+I asked the AI to turn my feedback into a structured prompt first, then execute it:
+
+```
+You are the product engineer for Worldesk... Implement these three changes based on user feedback, keeping the existing design system, trust rules and the Perplexity Agent API route.
+1. Landing page first — every visit opens the landing page; returning users see "Welcome back" + "Open my briefing"; add "How it works" and a real example story card.
+2. An explorable briefing — every story card shows a category tag (fixed set, assigned by the AI); a filter row with "Top stories" (default: one strong story per profile topic) plus one chip per category; choosing a category fetches 5 new stories in that category from the same trusted outlets without repeats; "Load more" at the bottom.
+3. Reasons to come back — "New" badges and "N new since your last visit"; a visible itinerary-aware "Briefing rhythm": >7 days out weekly digest → final week daily briefing → day before pre-arrival brief → in city morning brief + breaking alerts on the user's topics; alert settings (email / browser notification / off) with a real "Send test alert"; be honest that scheduled delivery isn't connected.
+Constraints: mobile-first, no new dependencies, no login or database. Verify with a type check and a live run on Munich.
+```
+
+**The reminder design, and why:** reminders get more frequent as the trip gets closer, which extends our "itinerary-aware" pillar. Executives dislike notification noise, so the default is one digest, and breaking alerts are opt-in and limited to their own topics.
+
 ## 3. Key design decisions for trustworthiness
 1. **A fixed list of approved outlets for each market** (`lib/sources.ts`), e.g. Germany: Handelsblatt, FAZ, Süddeutsche, Automobilwoche; Japan: Nikkei, NHK, Asahi. The AI search is technically limited to these domains (`search_domain_filter`).
 2. **Search in the local language** (German, Japanese…), then translate and summarize in English.
@@ -45,6 +60,8 @@ The AI read our group report and gave feedback:
 | v4 | Connected live search using the Perplexity **Agent API** (`/v1/agent`, `web_search` tool limited to approved domains, results returned as structured JSON), replacing the one-shot `sonar` call | The core claim has to be real; the Agent API can search several times before answering |
 | v5 | Live test: Munich returned 6 German automotive stories, all verified. **Tokyo failed**: all 3 stories came from NHK World (English) and none were about autos | Found by testing with a real persona |
 | v6 | Blocked English editions in code (NHK World, Nikkei Asia, `/en/` pages); required search queries in the local language and at least half of stories on the user's industry; added Nikkan Kogyo Shimbun and Toyo Keizai. Tokyo now returns 6 Japanese-language automotive stories, all verified | "Local sources" has to mean local-language reporting, not just local domains |
+| v7 | Feedback round 2: landing page first (with "Welcome back" for returning users), category tags on every story, filter chips with a 5-story deep-dive per category, "Load more", "New since last visit" badges, an itinerary-aware briefing rhythm and alert settings with a real test notification | After reading 6 stories there was nothing left to do and no reason to come back |
+| v8 | Bug from testing v7: choosing a category showed no new stories. The AI kept returning stories already shown, which my code dropped as duplicates. Fix: ask for 4 extra candidates, search the past month for category deep-dives, and show a clear "no new stories" message instead of failing silently. Regulation & Policy then returned 5 new stories, including a German ban on certain environmental claims in advertising | Found by testing the filter live |
 
 ## 5. How "itinerary-aware" works (the logic)
 - The stop you're in, or the next upcoming one, gets a **full briefing (6 stories)**.

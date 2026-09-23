@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isEnglishEdition, marketFor, outletForUrl } from "@/lib/sources";
 import { sampleBriefing } from "@/lib/sample";
-import type { Article, Briefing, Leg, Profile } from "@/lib/types";
+import { TOPICS, type Article, type Briefing, type Leg, type Profile } from "@/lib/types";
 
 export const maxDuration = 60;
 
@@ -21,8 +21,9 @@ const SCHEMA = {
           summary: { type: "string" },
           why_it_matters: { type: "string" },
           url: { type: "string" },
+          category: { type: "string", enum: TOPICS },
         },
-        required: ["outlet", "original_headline", "english_headline", "date", "summary", "why_it_matters", "url"],
+        required: ["outlet", "original_headline", "english_headline", "date", "summary", "why_it_matters", "url", "category"],
       },
     },
   },
@@ -40,7 +41,10 @@ type AgentResponse = {
   }[];
 };
 
-async function search(profile: Profile, leg: Leg, count: number, recency: "week" | "month") {
+type Req = { profile: Profile; leg: Leg; count: number; topic?: string; exclude: string[] };
+
+async function search({ profile, leg, count: wanted, topic, exclude }: Req, recency: "week" | "month") {
+  const count = exclude.length ? wanted + 4 : wanted;
   const market = marketFor(leg.country)!;
   const outlets = market.outlets.map((o) => `${o.name} (${o.domain})`).join(", ");
 
@@ -53,7 +57,14 @@ At least half of the stories must be directly about the reader's industry; the r
 Topics they follow: ${profile.topics.join(", ") || "markets and economy"}.
 Trip: ${leg.city}, ${leg.country}, ${leg.arrive} to ${leg.depart}.
 
-Find up to ${count} recent stories from the outlets above that this reader should know before meetings in ${leg.city}. Rank by relevance to their industry and function.
+${
+    topic
+      ? `Find up to ${count} recent stories from the outlets above in the category "${topic}" that this reader should know before meetings in ${leg.city}. Every story must fit that category.`
+      : `Find up to ${count} recent stories from the outlets above that this reader should know before meetings in ${leg.city}. Cover the reader's topics: aim for at least one strong story per topic, then rank by relevance to their industry and function.`
+  }
+Tag each story with exactly one category from: ${TOPICS.join(", ")}.${
+    exclude.length ? `\nThe reader has already seen these, do NOT return them again:\n${exclude.slice(0, 40).join("\n")}` : ""
+  }
 For each: outlet name, the original ${market.language} headline, an accurate English translation, publication date (YYYY-MM-DD), a 2-sentence English summary that keeps the local framing and tone, and one sentence "why it matters" addressed to this reader (concrete: which conversation or decision it affects).
 landing_note: one sentence on the overall business mood in ${leg.city} this week, based only on these stories.`;
 
@@ -102,9 +113,15 @@ landing_note: one sentence on the overall business mood in ${leg.city} this week
   return { parsed, results, market };
 }
 
-function clean(parsed: { articles: Article[] }, results: SearchResult[], market: NonNullable<ReturnType<typeof marketFor>>) {
+function clean(
+  parsed: { articles: Article[] },
+  results: SearchResult[],
+  market: NonNullable<ReturnType<typeof marketFor>>,
+  exclude: string[],
+  topic?: string,
+) {
   const found = new Set(results.map((r) => r.url.replace(/\/$/, "")));
-  const seen = new Set<string>();
+  const seen = new Set<string>(exclude.map((u) => u.replace(/\/$/, "")));
   const out: Article[] = [];
   for (const a of parsed.articles ?? []) {
     const outlet = outletForUrl(a.url, market);
@@ -115,7 +132,9 @@ function clean(parsed: { articles: Article[] }, results: SearchResult[], market:
     seen.add(key);
     // Drop bare home/section pages: an article URL has a meaningful path
     if (new URL(a.url).pathname.split("/").filter(Boolean).length < 1) continue;
-    out.push({ ...a, outlet: outlet.name, verified: found.has(key) });
+    // A topic request searched for that category, so file its results there
+    const category = topic ?? (TOPICS.includes(a.category) ? a.category : "Markets & Economy");
+    out.push({ ...a, category, outlet: outlet.name, verified: found.has(key) });
   }
   // Prefer stories the search engine actually returned; keep unverified only as filler
   out.sort((x, y) => Number(y.verified) - Number(x.verified));
@@ -124,21 +143,24 @@ function clean(parsed: { articles: Article[] }, results: SearchResult[], market:
 }
 
 export async function POST(req: Request) {
-  const { profile, leg, count = 5 } = (await req.json()) as { profile: Profile; leg: Leg; count?: number };
+  const body = (await req.json()) as Partial<Req>;
+  const { profile, leg } = body as Req;
+  const r: Req = { profile, leg, count: body.count ?? 5, topic: body.topic, exclude: body.exclude ?? [] };
   if (!marketFor(leg.country)) {
     return NextResponse.json({ error: `${leg.country} is not a covered market yet` }, { status: 400 });
   }
   if (!process.env.PERPLEXITY_API_KEY) {
-    return NextResponse.json(sampleBriefing(profile, leg, count));
+    return NextResponse.json(sampleBriefing(profile, leg, r.count, r.topic));
   }
   try {
-    let { parsed, results, market } = await search(profile, leg, count, "week");
-    let articles = clean(parsed, results, market);
-    if (articles.length < 3) {
-      ({ parsed, results, market } = await search(profile, leg, count, "month"));
-      articles = clean(parsed, results, market);
+    // Topic deep-dives look back a month so there is enough to explore; the top briefing stays on this week
+    let { parsed, results, market } = await search(r, r.topic ? "month" : "week");
+    let articles = clean(parsed, results, market, r.exclude, r.topic);
+    if (articles.length < 3 && !r.topic) {
+      ({ parsed, results, market } = await search(r, "month"));
+      articles = clean(parsed, results, market, r.exclude, r.topic);
     }
-    const briefing: Briefing = { landing_note: parsed.landing_note, articles: articles.slice(0, count), source: "live" };
+    const briefing: Briefing = { landing_note: parsed.landing_note, articles: articles.slice(0, r.count), source: "live" };
     return NextResponse.json(briefing);
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 502 });

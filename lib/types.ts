@@ -24,7 +24,9 @@ export type Article = {
   summary: string;
   why_it_matters: string;
   url: string;
+  category: string; // one of TOPICS, assigned by the model
   verified: boolean; // url appeared in the search engine's own results
+  origin?: string; // client-side: which filter request loaded it ("top" or a topic)
 };
 
 export type Briefing = {
