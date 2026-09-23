@@ -121,7 +121,7 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 600; margin: 0; }
 .story-meta .outlet { font-weight: 700; color: var(--ink); letter-spacing: 0.02em; }
 .verified { color: var(--accent); font-weight: 600; }
 .orig { font-size: 13px; color: var(--muted); margin: 8px 0 4px; }
-.story h3 { font-size: 21px; line-height: 1.25; }
+.story h3 { font-size: 21px; line-height: 1.25; margin-top: 12px; }
 .story.lead h3 { font-size: 28px; }
 .story p.sum { margin: 8px 0 0; color: var(--ink-2); }
 .why { margin-top: 12px; background: var(--accent-soft); padding: 10px 12px; font-size: 14px; }
