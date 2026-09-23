@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CITIES, MARKETS, marketFor } from "@/lib/sources";
+import { DOTS, PINS, WORLD } from "@/lib/worldDots";
 import {
   AGE_RANGES, FUNCTIONS, INDUSTRIES, TOPICS,
   type Article, type Briefing, type Leg, type Profile, type Stage,
@@ -126,43 +127,35 @@ export default function Home() {
 function Welcome({ returning, name, onStart, onOpen, onEdit, onDemo }: {
   returning: boolean; name: string; onStart: () => void; onOpen: () => void; onEdit: () => void; onDemo: () => void;
 }) {
+  // Intro "shuffle" plays once per browser session; reduced-motion users skip straight to the message.
+  const [phase, setPhase] = useState<"intro" | "done">(() => {
+    try {
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return "done";
+      return sessionStorage.getItem("wd.intro") ? "done" : "intro";
+    } catch { return "done"; }
+  });
+  useEffect(() => {
+    if (phase !== "intro") return;
+    try { sessionStorage.setItem("wd.intro", "1"); } catch { /* ignore */ }
+    const t = setTimeout(() => setPhase("done"), 3000);
+    return () => clearTimeout(t);
+  }, [phase]);
+
   return (
-    <div className="ld">
+    <div className={`ld ld-${phase}`} onClick={() => phase === "intro" && setPhase("done")}>
+      <WorldCarousel />
+      <p className="ld-caption ld-mono" aria-hidden="true">READING THE WORLD&apos;S LOCAL PRESS…</p>
       <header className="ld-top">
         <span className="ld-mono">WORLDESK // {MARKETS.length} MARKETS ONLINE</span>
         <span className="ld-mono ld-muted">V0.1 PROTOTYPE</span>
       </header>
 
-      <div className="ld-art" aria-hidden="true">
-        <svg viewBox="0 0 600 600">
-          <defs>
-            <linearGradient id="ldRing" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stopColor="#eef2f7" />
-              <stop offset="0.45" stopColor="#a9b6c8" />
-              <stop offset="1" stopColor="#dfe5ee" />
-            </linearGradient>
-            <filter id="ldBlur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="16" /></filter>
-            <filter id="ldSoft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="5" /></filter>
-          </defs>
-          <g className="ld-spin">
-            <path d="M300,80 C430,66 528,168 532,286 C536,404 468,522 336,532 C214,541 86,472 72,338 C58,206 172,94 300,80 Z"
-              fill="none" stroke="url(#ldRing)" strokeWidth="70" filter="url(#ldBlur)" />
-            <path d="M300,96 C418,86 506,176 512,288 C516,396 454,504 338,514 C226,522 104,460 92,338 C80,216 184,108 300,96 Z"
-              fill="none" stroke="#ffffff" strokeOpacity="0.9" strokeWidth="10" filter="url(#ldSoft)" />
-          </g>
-        </svg>
-      </div>
+      <div className="ld-spacer" />
 
       <main className="ld-card">
         <span className="ld-pill-tag">{returning ? `WELCOME BACK, ${name.toUpperCase()}` : "WORLDESK.BRIEFING"}</span>
         <h1 className="ld-title">Know the market before you land.</h1>
         <p className="ld-sub">Local business press, read in the local language and briefed in English for your role and your trip.</p>
-
-        <div className="ld-markets">
-          {[["MUC", "Handelsblatt"], ["TYO", "Nikkei"], ["SAO", "Valor"]].map(([code, paper]) => (
-            <div key={code} className="ld-market"><b>{code}</b><span>{paper}</span></div>
-          ))}
-        </div>
 
         <div className="ld-divider"><span>HOW IT WORKS</span></div>
 
@@ -192,6 +185,69 @@ function Welcome({ returning, name, onStart, onOpen, onEdit, onDemo }: {
 
       <span className="ld-side ld-mono" aria-hidden="true">LOCAL · LANGUAGE · SOURCES</span>
       <footer className="ld-bottom ld-mono">BRIEFING_READY<span className="ld-cursor">_</span></footer>
+    </div>
+  );
+}
+
+// Sixteen regional windows onto one dotted world map, arranged on a 3D cylinder.
+const REGIONS: { name: string; x: number; y: number }[] = [
+  { name: "North America", x: 30, y: 22 },
+  { name: "Europe", x: 78, y: 19 },
+  { name: "East Asia", x: 124, y: 27 },
+  { name: "South America", x: 55, y: 48 },
+  { name: "Middle East", x: 95, y: 31 },
+  { name: "Southeast Asia", x: 122, y: 40 },
+  { name: "Central America", x: 38, y: 35 },
+  { name: "Africa", x: 81, y: 42 },
+  { name: "Oceania", x: 136, y: 54 },
+  { name: "Nordics", x: 80, y: 10 },
+  { name: "South Asia", x: 105, y: 34 },
+  { name: "North Atlantic", x: 60, y: 20 },
+  { name: "West Africa", x: 72, y: 40 },
+  { name: "Central Asia", x: 101, y: 20 },
+  { name: "Caribbean", x: 45, y: 32 },
+  { name: "East Africa", x: 90, y: 45 },
+];
+const WIN_W = 36, WIN_H = 48, DOT_R = 0.3, PIN_R = 0.75;
+
+function dotPath(dots: [number, number][], r: number) {
+  return dots.map(([x, y]) => `M${x - r},${y}a${r},${r} 0 1,0 ${2 * r},0a${r},${r} 0 1,0 ${-2 * r},0`).join("");
+}
+
+function WorldCarousel() {
+  const cards = useMemo(() => REGIONS.map((r, i) => {
+    const x0 = Math.max(0, Math.min(WORLD.width - WIN_W, r.x - WIN_W / 2));
+    const y0 = Math.max(0, Math.min(WORLD.height - WIN_H, r.y - WIN_H / 2));
+    const inWin = ([x, y]: [number, number]) => x >= x0 - 1 && x <= x0 + WIN_W + 1 && y >= y0 - 1 && y <= y0 + WIN_H + 1;
+    return {
+      ...r, i, viewBox: `${x0} ${y0} ${WIN_W} ${WIN_H}`,
+      dots: dotPath(DOTS.filter(inWin), DOT_R),
+      pins: PINS.filter(inWin),
+      tone: ["light", "dark", "mist"][i % 3],
+    };
+  }), []);
+
+  return (
+    <div className="ld-stage" aria-hidden="true">
+      <div className="ld-ring">
+        {cards.map((c) => (
+          <figure key={c.name} className={`ld-tile ${c.tone}`} style={{ "--i": c.i } as React.CSSProperties}>
+            <svg viewBox={c.viewBox} preserveAspectRatio="xMidYMid slice">
+              <path d={c.dots} className="ld-dots" />
+              {c.pins.map(([x, y]) => (
+                <g key={`${x},${y}`}>
+                  <circle cx={x} cy={y} r={PIN_R * 2.2} className="ld-pin-halo" />
+                  <circle cx={x} cy={y} r={PIN_R} className="ld-pin" />
+                </g>
+              ))}
+            </svg>
+            <figcaption>
+              <span>{String(c.i + 1).padStart(2, "0")} / {REGIONS.length}</span>
+              <b>{c.name}</b>
+            </figcaption>
+          </figure>
+        ))}
+      </div>
     </div>
   );
 }
