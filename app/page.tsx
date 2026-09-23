@@ -252,6 +252,49 @@ function WorldCarousel() {
   );
 }
 
+// One window onto the dotted world map, centred on (cx, cy) in map units.
+function mapWindow(cx: number, cy: number) {
+  const x0 = Math.max(0, Math.min(WORLD.width - WIN_W, cx - WIN_W / 2));
+  const y0 = Math.max(0, Math.min(WORLD.height - WIN_H, cy - WIN_H / 2));
+  const inWin = ([x, y]: [number, number]) => x >= x0 - 1 && x <= x0 + WIN_W + 1 && y >= y0 - 1 && y <= y0 + WIN_H + 1;
+  return { viewBox: `${x0} ${y0} ${WIN_W} ${WIN_H}`, dots: dotPath(DOTS.filter(inWin), DOT_R), pins: PINS.filter(inWin) };
+}
+
+// Brand banner from the design-system cover: wordmark left, brand shapes right, never overlapping.
+function BrandBanner() {
+  const europe = useMemo(() => mapWindow(78, 19), []);
+  const asia = useMemo(() => mapWindow(124, 27), []);
+  const tile = (w: ReturnType<typeof mapWindow>, x: number, y: number, width: number, height: number, tone: "dark" | "mist") => (
+    <g>
+      <rect x={x} y={y} width={width} height={height} rx="6" className={`bb-${tone}`} />
+      <svg x={x} y={y} width={width} height={height} viewBox={w.viewBox} preserveAspectRatio="xMidYMid slice">
+        <path d={w.dots} className={`bb-${tone}-dot`} />
+        {w.pins.map(([px, py]) => (
+          <g key={`${px},${py}`}>
+            <circle cx={px} cy={py} r={PIN_R * 2.2} className="bb-halo" />
+            <circle cx={px} cy={py} r={PIN_R} className="bb-pin" />
+          </g>
+        ))}
+      </svg>
+    </g>
+  );
+  return (
+    <div className="brand-banner" aria-hidden="true">
+      <div className="bb-text">
+        <div className="bb-word">Worldesk</div>
+        <div className="bb-tag">Know the market before you land.</div>
+      </div>
+      <svg className="bb-art" viewBox="0 0 320 260" preserveAspectRatio="xMaxYMid meet">
+        <rect x="200" y="-60" width="200" height="380" rx="40" className="bb-surface" />
+        {tile(europe, 8, 34, 112, 152, "dark")}
+        {tile(asia, 132, 104, 86, 116, "mist")}
+        <rect x="222" y="30" width="92" height="36" rx="18" className="bb-fill" />
+        <rect x="222" y="194" width="98" height="44" rx="22" className="bb-ink" />
+      </svg>
+    </div>
+  );
+}
+
 function ProfileStep({ profile, setProfile, onBack, onNext }: {
   profile: Profile; setProfile: (p: Profile) => void; onBack: () => void; onNext: () => void;
 }) {
@@ -262,6 +305,7 @@ function ProfileStep({ profile, setProfile, onBack, onNext }: {
 
   return (
     <section className="step">
+      <BrandBanner />
       <div className="step-head">
         <div className="kicker">Step 1 of 2</div>
         <h2>Tell us about your work</h2>
@@ -630,7 +674,12 @@ function BriefingView({ profile, legs }: { profile: Profile; legs: Leg[] }) {
       {feed?.source === "sample" && (
         <div className="banner">Sample mode: no API key is configured, so these are placeholders. Live mode pulls real articles.</div>
       )}
-      {feed?.note && filter === "top" && <p className="landing">{feed.note}</p>}
+      {feed?.note && filter === "top" && (
+        <div className="summary">
+          <div className="summary-label">This week in {leg.city}</div>
+          <p>{feed.note}</p>
+        </div>
+      )}
 
       {visible.length === 0 && startedAt && (
         <Progress startedAt={startedAt} leg={leg} profile={profile} topic={filter === "top" ? undefined : filter} />
