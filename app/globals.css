@@ -1,22 +1,28 @@
 :root {
-  /* tweakcn theme (cmlk6zefr000004lbe9jygsqc) mapped onto Worldesk's tokens */
-  --paper: oklch(1 0 0);                       /* white page background (theme default was blue-grey) */
-  --card: oklch(1 0 0);                        /* card */
-  --ink: oklch(0.3211 0 0);                    /* foreground */
-  --ink-2: oklch(0.40 0.01 260);
-  --muted: oklch(0.5510 0.0234 264.3637);      /* muted-foreground */
-  --rule: oklch(0.8452 0 0);                   /* border */
-  --primary: oklch(0.6420 0.1691 38.5815);     /* orange: main actions */
-  --primary-fg: oklch(1 0 0);
-  --accent: oklch(0.4138 0.0846 259.8759);     /* secondary navy: links, tags, active chips */
-  --accent-soft: oklch(0.9119 0.0222 243.8174);/* accent */
-  --brass: oklch(0.6420 0.1691 38.5815);       /* kickers use the primary orange */
-  --danger: oklch(0.6368 0.2078 25.3313);      /* destructive */
-  --ring: oklch(0.6397 0.1720 36.4421);
-  --radius: 0.5rem;
-  --shadow-sm: 0px 1px 3px 0px hsl(0 0% 10.1961% / 0.10), 0px 1px 2px -1px hsl(0 0% 10.1961% / 0.10);
-  --serif: var(--font-serif), Georgia, "Times New Roman", serif;
-  --sans: var(--font-sans), -apple-system, "Segoe UI", sans-serif;
+  /* Worldesk design system (landing palette), applied app-wide */
+  --paper: #f4f5f8;        /* ground */
+  --card: #eeeff2;         /* surface: large rounded panels */
+  --fill: #e3e4e8;         /* pill controls and rows */
+  --ink: #0b0b0c;          /* text, primary action */
+  --ink-2: #3d4046;        /* body copy inside cards */
+  --muted: #5f636b;        /* meaningful small text: 5.2:1 on surface */
+  --link-ink: #55585f;
+  --rule: #d6d8dd;         /* hairline */
+  --primary: #0b0b0c;
+  --primary-fg: #ffffff;
+  --accent: #0b0b0c;       /* monochrome system: accents are ink */
+  --accent-soft: #e3e4e8;
+  --brass: #5f636b;
+  --danger: #b3261e;
+  --signal: #e8622c;       /* map pins only */
+  --ring: #0b0b0c;
+  --radius: 999px;
+  --radius-card: 28px;
+  --shadow-sm: 0 30px 80px -48px rgba(30, 40, 60, 0.28);
+  --shadow-button: 0 18px 40px -18px rgba(0, 0, 0, 0.45);
+  --serif: var(--font-grotesk), -apple-system, "Segoe UI", sans-serif;
+  --sans: var(--font-grotesk), -apple-system, "Segoe UI", sans-serif;
+  --mono: var(--font-mono), ui-monospace, Menlo, monospace;
 }
 
 * { box-sizing: border-box; }
@@ -307,3 +313,78 @@ article.story[data-url] { background: var(--card); border: 1px solid var(--rule)
 @media (prefers-reduced-motion: reduce) {
   .ld-intro .ld-ring, .ld-done .ld-ring, .ld-cursor { animation: none; }
 }
+
+/* ---------- App pages in the landing's system ---------- */
+body { background: radial-gradient(1000px 700px at 15% 0%, #e9ebf0 0%, var(--paper) 60%) no-repeat, var(--paper); }
+h1, h2, h3 { font-family: var(--sans); font-weight: 600; letter-spacing: -0.02em; line-height: 1.12; }
+.kicker { font-family: var(--mono); font-weight: 400; font-size: 11px; letter-spacing: 0.2em; color: var(--muted); }
+.field label, .label { font-family: var(--mono); font-weight: 400; font-size: 11px; letter-spacing: 0.18em; color: var(--muted); }
+
+/* Masthead: the WORLDESK brand pill */
+.mast { border-bottom: 0; padding: 22px 0 6px; align-items: center; }
+.wordmark { font-family: var(--sans); font-weight: 700; font-size: 13px; letter-spacing: 0.24em; text-transform: uppercase;
+  background: var(--ink); color: #fff; border-radius: 999px; padding: 8px 16px 8px 18px; }
+.wordmark span { color: inherit; }
+.mast-meta { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; color: var(--muted); }
+.mast-meta button { color: var(--link-ink); font-family: var(--sans); font-size: 13px; letter-spacing: 0; text-underline-offset: 3px; }
+
+/* Buttons */
+.btn { border-radius: 999px; background: var(--ink); border-color: var(--ink); color: #fff; box-shadow: var(--shadow-button); padding: 14px 24px; font-family: var(--sans); letter-spacing: 0.02em; }
+.btn:hover { filter: none; background: #26272b; }
+.btn.ghost { background: var(--fill); border-color: var(--fill); color: var(--ink); box-shadow: none; }
+.btn.ghost:hover { background: #d9dade; }
+.btn.link { color: var(--link-ink); text-underline-offset: 3px; }
+.small-btn { padding: 9px 16px; }
+
+/* Forms */
+.field input, .field select { background: var(--fill); border: 1px solid transparent; border-radius: 999px; padding: 14px 20px; font-family: var(--sans); }
+.field input:focus, .field select:focus { outline: 2px solid var(--ink); outline-offset: 1px; border-color: transparent; }
+.field select { appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--ink) 50%), linear-gradient(135deg, var(--ink) 50%, transparent 50%);
+  background-position: calc(100% - 24px) 52%, calc(100% - 18px) 52%; background-size: 6px 6px; background-repeat: no-repeat; padding-right: 44px; }
+.chip { background: var(--fill); border-color: var(--fill); color: var(--ink); font-family: var(--sans); }
+.chip.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+.actions { border-top: 1px solid var(--rule); }
+.step-head h2 { font-size: 34px; }
+
+/* Surfaces */
+.leg, .alert-card, .timeline, article.story[data-url] { background: var(--card); border: 0; border-radius: var(--radius-card); box-shadow: var(--shadow-sm); }
+.leg { padding: 20px 22px; }
+.leg-num { font-family: var(--mono); font-style: normal; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
+.sources-line b { color: var(--ink); }
+.timeline { border: 0; }
+.stop { border-right-color: var(--rule); }
+.stop .city { font-family: var(--sans); font-weight: 600; letter-spacing: -0.01em; }
+.stop.sel { background: var(--fill); }
+.stop.sel::after { background: var(--ink); }
+.stage { font-family: var(--mono); font-weight: 400; letter-spacing: 0.16em; }
+.stage.next, .stop.next .depth, .stop.now .depth { color: var(--ink); }
+.stage.now { color: var(--danger); }
+.greet h1 { font-size: 32px; }
+.city-head h2 { font-size: 40px; }
+.city-sub { color: var(--muted); }
+.landing { font-family: var(--sans); font-style: normal; font-size: 17px; color: var(--ink-2); border-left: 2px solid var(--ink); }
+.alert-card { padding: 16px 20px; }
+
+/* Story cards */
+article.story[data-url] { padding: 22px 24px; margin-top: 14px; }
+.story-meta { font-size: 12px; }
+.story-meta .outlet { color: var(--ink); }
+.tag { font-family: var(--mono); font-weight: 400; letter-spacing: 0.12em; color: var(--ink); background: var(--fill); border: 0; padding: 4px 10px; border-radius: 999px; }
+button.tag:hover { background: #d9dade; }
+.new { background: var(--ink); color: #fff; font-family: var(--mono); font-weight: 400; letter-spacing: 0.12em; padding: 4px 10px; border-radius: 999px; }
+.new-count { color: var(--ink); }
+.verified { color: var(--ink-2); font-weight: 500; }
+.story h3 { font-family: var(--sans); font-weight: 600; }
+.story p.sum { color: var(--ink-2); }
+.why { background: var(--paper); border-radius: 18px; padding: 12px 16px; }
+.why b { font-family: var(--mono); font-weight: 400; letter-spacing: 0.16em; color: var(--muted); }
+.read { color: var(--ink); text-underline-offset: 3px; }
+
+/* Progress, filters, footer */
+.progress-title { font-family: var(--sans); font-weight: 600; }
+.progress-steps li.done { color: var(--ink); }
+.progress .bar { background: var(--fill); }
+.progress .bar i { background: var(--ink); }
+.filters { border-top: 0; }
+.banner { border-radius: 18px; }
+.foot { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; border-top: 1px solid var(--rule); }
