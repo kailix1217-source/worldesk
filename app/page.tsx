@@ -297,11 +297,11 @@ function BrandBanner() {
         <div className="bb-tag">Know the market before you land.</div>
       </div>
       <svg className="bb-art" viewBox="0 0 320 260" preserveAspectRatio="xMaxYMid meet">
-        <rect x="200" y="-60" width="200" height="380" rx="40" className="bb-surface" />
-        {tile(europe, 8, 34, 112, 152, "dark")}
-        {tile(asia, 132, 104, 86, 116, "mist")}
-        <rect x="222" y="30" width="92" height="36" rx="18" className="bb-fill" />
-        <rect x="222" y="194" width="98" height="44" rx="22" className="bb-ink" />
+        <rect x="196" y="8" width="124" height="244" rx="28" className="bb-surface" />
+        {tile(europe, 8, 28, 112, 152, "dark")}
+        {tile(asia, 132, 96, 84, 112, "mist")}
+        <rect x="214" y="28" width="92" height="36" rx="18" className="bb-fill" />
+        <rect x="214" y="196" width="92" height="40" rx="20" className="bb-ink" />
       </svg>
     </div>
   );
@@ -404,7 +404,6 @@ function AboutStep({ profile, setProfile, onBack, onNext }: {
   const valid = profile.title.trim() && profile.func && profile.industry;
   return (
     <section className="ob">
-      <BrandBanner />
       <StepHead n={2} title="About you" sub="We use this to order stories for your role and industry." />
       <div className="ob-form">
         <div className="field">
@@ -434,6 +433,7 @@ function AboutStep({ profile, setProfile, onBack, onNext }: {
         <button className="btn link" onClick={onBack}>Back</button>
         <button className="btn" disabled={!valid} onClick={onNext}>Continue</button>
       </div>
+      <BrandBanner />
     </section>
   );
 }
