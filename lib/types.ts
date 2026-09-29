@@ -1,11 +1,14 @@
 export type Profile = {
   name: string;
+  email: string; // kept only in this browser; passwords are never stored
   title: string;
-  ageRange: string;
+  company: string; // optional
   industry: string;
   func: string;
-  homeCountry: string;
+  markets: string[]; // country names from ONBOARD_MARKETS
   topics: string[];
+  ageRange?: string; // legacy fields from the first version
+  homeCountry?: string;
 };
 
 export type Leg = {

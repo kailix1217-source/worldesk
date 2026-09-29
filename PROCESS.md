@@ -1,7 +1,7 @@
 # Worldesk prototype: process documentation
 Kailin Xu · MOR-531 Applied Product Management · Individual prototype
 
-**Prototype link:** https://worldesk.vercel.app (live; tap "See a sample executive" for the Munich → Tokyo demo)
+**Prototype link:** https://worldesk.vercel.app (live; tap "See a sample executive" for the Germany + Japan demo)
 **Code:** https://github.com/kailix1217-source/worldesk
 
 ## Tool
@@ -61,6 +61,19 @@ Fix six problems while keeping trust rules, design system and API:
 6. Replace the unexplained 4-bar depth meter with a plain label ("Full briefing" / "Preview").
 ```
 
+### Feedback round 4 (onboarding redesign)
+My feedback (in Chinese, summarized): split "Tell us about your work" into several steps following four reference screens (Create your account → About you → Choose your markets → Choose topics), remove the "Where are you headed?" trip step so "Build my briefing" comes right after topics, and keep Worldesk's light colors instead of the references' dark navy.
+
+Structured prompt given to the AI:
+```
+Redesign onboarding after "Set up my briefing". Follow the layout of the four reference screens, keep Worldesk's visual system (light ground, white cards, grey pill inputs, black pill button, Space Grotesk/Mono, #E8622C for selected states).
+1. Create your account: full name, email, password; "Already have an account? Log in". Prototype: account stays in this browser, never store the password, say so.
+2. About you: job title, function, industry, company (optional).
+3. Choose your markets: US, UK, DE, JP, AU, FR, IN, BR, CN, CA, SG, AE; Continue disabled until one is picked.
+4. Choose topics (optional); primary button "Build my briefing".
+Remove the trip step; organise the briefing by market (one tab per country), loading a market when its tab opens. Add trusted outlets for the new markets; the English-edition block applies only to non-English markets. Use the company to sharpen "Why it matters". Migrate saved profiles.
+```
+
 ## 3. Key design decisions for trustworthiness
 1. **A fixed list of approved outlets for each market** (`lib/sources.ts`), e.g. Germany: Handelsblatt, FAZ, Süddeutsche, Automobilwoche; Japan: Nikkei, NHK, Asahi. The AI search is technically limited to these domains (`search_domain_filter`).
 2. **Search in the local language** (German, Japanese…), then translate and summarize in English.
@@ -88,16 +101,18 @@ Fix six problems while keeping trust rules, design system and API:
 | v15 | Feedback: put the design-system cover on the profile page and highlight the briefing summary. Added a brand banner (wordmark + real dotted-map tiles with market pins, sized so shapes never overlap the name) above the profile form; the "this week in <city>" summary became a dark ink panel, the page's strongest block | A branded moment during setup; the one-sentence takeaway should be read first |
 | v16 | Feedback: add a plane motif above the trip form. Added a dark "night flight" banner: the dotted world map with the user's stops drawn live as orange dashed routes, a plane flying the first leg (static for reduced-motion users), and "YOUR ROUTE · Munich → Tokyo". The view centres on the route so both ends stay visible on phones | The trip step should feel like planning a journey, and reflect the input as it's typed |
 | v17 | Selected profile topics turn orange (#E8622C, dark text for contrast, with a ✓). Merged the design branch into main and deployed to Vercel; the API key is stored as a Vercel secret, never in the code or uploads | Ship a public link for the class |
+| v18 | Feedback round 4: a 4-step onboarding (account → about you → markets → topics) with a progress bar, following reference layouts in Worldesk's colors. The trip step is gone: the briefing now has one tab per chosen market and loads a market when its tab opens. Added trusted outlets for 7 new markets (US, UK, Australia, India, Canada, Singapore, UAE); the English-edition block now applies only to non-English markets. The optional company sharpens "Why it matters" (tested: "For Acme Robotics, this affects sourcing…"). Accounts stay in the browser with no stored password; testing showed "Log in" could never find an account, so "Start over" became "Log out" and the sample executive became a separate demo that no longer overwrites your profile | Shorter, clearer setup; follow the markets an executive actually works in rather than one trip |
 
-## 5. How "itinerary-aware" works (the logic)
-- The stop you're in, or the next upcoming one, gets a **full briefing (6 stories)**.
-- Later stops get an **early preview (3 stories)** that grows as the date gets closer.
-- Past stops become a **recap**.
-- The 4-bar "depth" meter on each city in the timeline shows this weighting.
+## 5. How the briefing is organised (current version)
+- One tab per market the user follows, in the order they picked them. Each market is searched through its business hub (e.g. Germany → Frankfurt).
+- A market's stories load when its tab is opened and are cached for the day, so following 12 markets doesn't start 12 searches at once.
+- The user's chosen topics are preloaded for the open market; with no topics chosen, every topic is offered as a filter.
+- *(Until v17 the briefing followed a trip: the next stop got the full briefing, later stops a preview, past stops a recap. v18 replaced trips with markets.)*
 
 ## 6. What's real vs. out of scope
-**Real:** onboarding, trip entry, live local-language news search, translation, relevance filtered to the user's role, source checks.
-**Not built (roadmap):** accounts and login, importing trips from email, flight status, conferences and dining, paid news licenses, company-wide (enterprise) features.
+**Real:** 4-step onboarding, live local-language news search across 12 markets, translation, relevance filtered to the user's role and company, source checks.
+**Prototype only:** accounts are kept in the browser (no server, no stored passwords); scheduled push delivery.
+**Not built (roadmap):** real accounts and login, trip planning and importing trips from email, flight status, conferences and dining, paid news licenses, company-wide (enterprise) features.
 
 ## Code
 Full source: see the repo. Main files: `lib/sources.ts`, `app/api/briefing/route.ts`, `app/page.tsx`.

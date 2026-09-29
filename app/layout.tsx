@@ -7,7 +7,7 @@ const mono = Space_Mono({ subsets: ["latin"], variable: "--font-mono", weight: [
 
 export const metadata: Metadata = {
   title: "Worldesk",
-  description: "Local news from trusted local papers, briefed for where your trip goes next.",
+  description: "Local business news from trusted local papers, briefed in English for your role and the markets you follow.",
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#F4F5F8" };

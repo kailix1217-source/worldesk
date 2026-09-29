@@ -1,37 +1,30 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CITIES, MARKETS, marketFor } from "@/lib/sources";
+import { ONBOARD_MARKETS, marketFor } from "@/lib/sources";
 import { DOTS, PINS, WORLD } from "@/lib/worldDots";
 import {
-  AGE_RANGES, FUNCTIONS, INDUSTRIES, TOPICS,
-  type Article, type Briefing, type Leg, type Profile, type Stage,
+  FUNCTIONS, INDUSTRIES, TOPICS,
+  type Article, type Briefing, type Leg, type Profile,
 } from "@/lib/types";
 
-type Step = "welcome" | "profile" | "trip" | "briefing";
+type Step = "welcome" | "account" | "about" | "markets" | "topics" | "briefing";
+const ONBOARDING: Step[] = ["account", "about", "markets", "topics"];
 
 const EMPTY_PROFILE: Profile = {
-  name: "", title: "", ageRange: AGE_RANGES[0], industry: "", func: "", homeCountry: "", topics: [],
+  name: "", email: "", title: "", company: "", industry: "", func: "", markets: [], topics: [],
 };
 
 const iso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-const addDays = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return iso(d); };
-const newLeg = (): Leg => ({ id: Math.random().toString(36).slice(2), city: "", country: "", arrive: "", depart: "" });
+const fmt = (d: string) =>
+  d ? new Date(d + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
 
-function demoData(): { profile: Profile; legs: Leg[] } {
-  return {
-    profile: {
-      name: "Maya", title: "Marketing Director, EMEA & APAC", ageRange: "35–44", industry: "Automotive",
-      func: "Marketing & Communications", homeCountry: "United States",
-      topics: ["Competitors", "Consumer Trends", "Regulation & Policy"],
-    },
-    legs: [
-      { id: "demo-muc", city: "Munich", country: "Germany", arrive: addDays(3), depart: addDays(5) },
-      { id: "demo-tyo", city: "Tokyo", country: "Japan", arrive: addDays(8), depart: addDays(11) },
-    ],
-  };
-}
+const DEMO_PROFILE: Profile = {
+  name: "Maya", email: "maya@example.com", title: "Marketing Director, EMEA & APAC", company: "",
+  industry: "Automotive", func: "Marketing & Communications", markets: ["Germany", "Japan"],
+  topics: ["Competitors", "Consumer Trends", "Regulation & Policy"],
+};
 
 function load<T>(key: string, fallback: T): T {
   try { const v = localStorage.getItem(key); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; }
@@ -40,61 +33,59 @@ function save(key: string, value: unknown) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage unavailable */ }
 }
 
-// Itinerary-aware weighting: the leg you're in (or heading to next) gets the full
-// briefing; later legs get a short preview; past legs shrink to a recap.
-function stagesFor(legs: Leg[]): Record<string, Stage> {
-  const today = iso(new Date());
-  const out: Record<string, Stage> = {};
-  let nextAssigned = legs.some((l) => l.arrive <= today && today <= l.depart);
-  for (const l of legs) {
-    if (l.depart < today) out[l.id] = "past";
-    else if (l.arrive <= today) out[l.id] = "now";
-    else if (!nextAssigned) { out[l.id] = "next"; nextAssigned = true; }
-    else out[l.id] = "later";
+// Profiles saved by the trip-based version have no markets: derive them from the old trip stops.
+function loadProfile(): Profile {
+  const stored = load<Partial<Profile>>("wd.profile", {});
+  const p: Profile = { ...EMPTY_PROFILE, ...stored, markets: stored.markets ?? [], topics: stored.topics ?? [] };
+  if (!p.markets.length) {
+    const legs = load<Leg[]>("wd.legs", []);
+    const offered = new Set(ONBOARD_MARKETS.map((m) => m.country));
+    p.markets = [...new Set(legs.map((l) => l.country).filter((c) => offered.has(c)))];
   }
-  return out;
+  return p;
 }
-const STORY_COUNT: Record<Stage, number> = { now: 6, next: 6, later: 3, past: 3 };
 
-function countdown(leg: Leg, stage: Stage) {
-  if (stage === "now") return "You're here";
-  if (stage === "past") return "Completed";
-  const days = Math.round((Date.parse(leg.arrive) - Date.parse(iso(new Date()))) / 86400000);
-  return days === 1 ? "Tomorrow" : `In ${days} days`;
-}
-const fmt = (d: string) =>
-  d ? new Date(d + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
+// The briefing is organised by market; each market is searched through its business hub.
+const legsFor = (markets: string[]): Leg[] =>
+  markets.map((c) => marketFor(c)).filter((m): m is NonNullable<typeof m> => !!m)
+    .map((m) => ({ id: m.country, city: m.hub, country: m.country, arrive: "", depart: "" }));
 
 export default function Home() {
   const [ready, setReady] = useState(false);
   const [step, setStep] = useState<Step>("welcome");
   const [profile, setProfile] = useState<Profile>(EMPTY_PROFILE);
-  const [legs, setLegs] = useState<Leg[]>([newLeg()]);
+  const [signedIn, setSignedIn] = useState(false);
+  const [demo, setDemo] = useState(false); // the sample executive never overwrites the user's own account
 
   useEffect(() => {
-    setProfile(load("wd.profile", EMPTY_PROFILE));
-    setLegs(load("wd.legs", [newLeg()]));
+    const p = loadProfile();
+    setProfile(p);
+    // Profiles from before accounts existed count as signed in.
+    setSignedIn(load<boolean | null>("wd.session", null) ?? !!(p.name && p.industry));
     setReady(true);
   }, []);
-  useEffect(() => { if (ready) { save("wd.profile", profile); save("wd.legs", legs); } }, [ready, step, profile, legs]);
+  useEffect(() => { if (ready) { save("wd.profile", profile); save("wd.session", signedIn); } }, [ready, profile, signedIn]);
   useEffect(() => { window.scrollTo(0, 0); }, [step]);
 
-  const startDemo = () => { const d = demoData(); setProfile(d.profile); setLegs(d.legs); setStep("briefing"); };
-  const reset = () => { setProfile(EMPTY_PROFILE); setLegs([newLeg()]); setStep("welcome"); };
+  const startDemo = () => { setDemo(true); setStep("briefing"); };
+  const exitDemo = () => { setDemo(false); setStep("welcome"); };
+  const logOut = () => { setSignedIn(false); setStep("welcome"); };
 
   if (!ready) return null;
-  const returning = !!(profile.industry && legs.length && legs.every((l) => l.city && l.arrive && l.depart));
+  const hasAccount = !!(profile.name && profile.email);
+  const returning = !!(signedIn && hasAccount && profile.industry && profile.func && profile.markets.length);
 
   if (step === "welcome") {
     return (
       <Welcome
-        returning={returning} name={profile.name}
-        onStart={() => setStep("profile")} onOpen={() => setStep("briefing")}
-        onEdit={() => setStep("profile")} onDemo={startDemo}
+        returning={returning} name={profile.name.split(" ")[0]}
+        onStart={() => setStep(signedIn && hasAccount ? "about" : "account")} onOpen={() => setStep("briefing")}
+        onEdit={() => setStep("about")} onDemo={startDemo}
       />
     );
   }
 
+  const stepNo = ONBOARDING.indexOf(step);
   return (
     <main className="wrap">
       <header className="mast">
@@ -105,21 +96,42 @@ export default function Home() {
           {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
           {step === "briefing" && (
             <div className="row" style={{ justifyContent: "flex-end", gap: 10 }}>
-              <button onClick={() => setStep("profile")}>Profile</button>
-              <button onClick={() => setStep("trip")}>Edit trip</button>
-              <button onClick={reset}>Start over</button>
+              {demo ? (
+                <button onClick={exitDemo}>Exit sample</button>
+              ) : (
+                <>
+                  <button onClick={() => setStep("about")}>Profile</button>
+                  <button onClick={() => setStep("markets")}>Markets</button>
+                  <button onClick={logOut}>Log out</button>
+                </>
+              )}
             </div>
           )}
         </div>
       </header>
 
-      {step === "profile" && (
-        <ProfileStep profile={profile} setProfile={setProfile} onBack={() => setStep("welcome")} onNext={() => setStep("trip")} />
+      {stepNo >= 0 && (
+        <div className="ob-progress" role="progressbar" aria-valuemin={1} aria-valuemax={4} aria-valuenow={stepNo + 1} aria-label="Setup progress">
+          {ONBOARDING.map((s, i) => <i key={s} className={i <= stepNo ? "on" : ""} />)}
+        </div>
       )}
-      {step === "trip" && (
-        <TripStep legs={legs} setLegs={setLegs} onBack={() => setStep("profile")} onNext={() => setStep("briefing")} />
+      {step === "account" && (
+        <AccountStep profile={profile} setProfile={setProfile} initialMode={hasAccount && !signedIn ? "login" : "create"}
+          onNext={() => { setSignedIn(true); setStep("about"); }}
+          onLoggedIn={(complete) => { setSignedIn(true); setStep(complete ? "briefing" : "about"); }} />
       )}
-      {step === "briefing" && <BriefingView profile={profile} legs={legs} />}
+      {step === "about" && (
+        <AboutStep profile={profile} setProfile={setProfile} onBack={() => setStep(hasAccount ? "welcome" : "account")} onNext={() => setStep("markets")} />
+      )}
+      {step === "markets" && (
+        <MarketsStep profile={profile} setProfile={setProfile} onBack={() => setStep("about")} onNext={() => setStep("topics")} />
+      )}
+      {step === "topics" && (
+        <TopicsStep profile={profile} setProfile={setProfile} onBack={() => setStep("markets")} onNext={() => setStep("briefing")} />
+      )}
+      {step === "briefing" && (demo
+        ? <BriefingView key="demo" profile={DEMO_PROFILE} />
+        : <BriefingView key={profile.markets.join(",")} profile={profile} />)}
     </main>
   );
 }
@@ -155,14 +167,14 @@ function Welcome({ returning, name, onStart, onOpen, onEdit, onDemo }: {
       <main className="ld-card">
         <span className="ld-brand">WORLDESK</span>
         <h1 className="ld-title">Know the market before you land.</h1>
-        <p className="ld-sub">{returning && <b className="ld-welcome">Welcome back, {name}. </b>}Local business press, read in the local language and briefed in English for your role and your trip.</p>
+        <p className="ld-sub">{returning && <b className="ld-welcome">Welcome back, {name}. </b>}Local business press, read in the local language and briefed in English for your role and the markets you follow.</p>
 
         <div className="ld-divider"><span>HOW IT WORKS</span></div>
 
         <ol className="ld-steps">
-          <li><span className="ld-mono">01</span>Tell us your industry, role and topics</li>
-          <li><span className="ld-mono">02</span>Add the cities on your trip</li>
-          <li><span className="ld-mono">03</span>Get local news, ranked for you, daily until you land</li>
+          <li><span className="ld-mono">01</span>Create an account and tell us your role</li>
+          <li><span className="ld-mono">02</span>Pick the markets and topics you follow</li>
+          <li><span className="ld-mono">03</span>Get local news, ranked for you, every morning</li>
         </ol>
 
         {returning ? (
@@ -295,47 +307,127 @@ function BrandBanner() {
   );
 }
 
-function ProfileStep({ profile, setProfile, onBack, onNext }: {
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function StepHead({ n, title, sub, center }: { n: number; title: string; sub: string; center?: boolean }) {
+  return (
+    <div className={`ob-head ${center ? "center" : ""}`}>
+      <div className="kicker">Step {n} of 4</div>
+      <h1>{title}</h1>
+      <p>{sub}</p>
+    </div>
+  );
+}
+
+// Prototype account: kept only in this browser. The password is checked for length and then discarded.
+function AccountStep({ profile, setProfile, initialMode, onNext, onLoggedIn }: {
+  profile: Profile; setProfile: (p: Profile) => void; initialMode: "create" | "login";
+  onNext: () => void; onLoggedIn: (complete: boolean) => void;
+}) {
+  const [mode, setMode] = useState<"create" | "login">(initialMode);
+  const [name, setName] = useState(profile.name);
+  const [email, setEmail] = useState(profile.email);
+  const [password, setPassword] = useState("");
+  const [touched, setTouched] = useState(false);
+  const [error, setError] = useState("");
+
+  const emailOk = EMAIL_RE.test(email.trim());
+  const pwOk = password.length >= 8;
+  const canCreate = name.trim() && emailOk && pwOk;
+
+  const create = (e: React.FormEvent) => {
+    e.preventDefault();
+    setTouched(true);
+    if (!canCreate) return;
+    const addr = email.trim().toLowerCase();
+    // A different email on this device is a new person: start from a blank profile.
+    const base = profile.email && profile.email !== addr ? EMPTY_PROFILE : profile;
+    setProfile({ ...base, name: name.trim(), email: addr });
+    setPassword("");
+    onNext();
+  };
+  const login = (e: React.FormEvent) => {
+    e.preventDefault();
+    setTouched(true);
+    if (!emailOk || !pwOk) return;
+    const saved = loadProfile();
+    if (saved.email && saved.email === email.trim().toLowerCase()) {
+      setProfile(saved);
+      setPassword("");
+      onLoggedIn(!!(saved.industry && saved.func && saved.markets.length));
+    } else {
+      setError("No Worldesk account with that email on this device. Create one instead.");
+    }
+  };
+
+  return (
+    <section className="ob ob-narrow">
+      <StepHead n={1} center title={mode === "create" ? "Create your account" : "Log in"}
+        sub={mode === "create" ? "Set up your personalized briefing." : "Welcome back. Open your briefing."} />
+      <form className="ob-form" onSubmit={mode === "create" ? create : login} noValidate>
+        {mode === "create" && (
+          <div className="field">
+            <label htmlFor="acc-name">Full name</label>
+            <input id="acc-name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Doe" />
+            {touched && !name.trim() && <span className="field-err">Enter your name.</span>}
+          </div>
+        )}
+        <div className="field">
+          <label htmlFor="acc-email">Email</label>
+          <input id="acc-email" type="email" autoComplete="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }} placeholder="executive@company.com" />
+          {touched && !emailOk && <span className="field-err">Enter a valid email address.</span>}
+        </div>
+        <div className="field">
+          <label htmlFor="acc-pw">Password</label>
+          <input id="acc-pw" type="password" autoComplete={mode === "create" ? "new-password" : "current-password"}
+            value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" />
+          {touched && !pwOk && <span className="field-err">Use at least 8 characters.</span>}
+        </div>
+        {error && <p className="field-err" role="alert">{error}</p>}
+        <button type="submit" className="btn ob-full">{mode === "create" ? "Continue" : "Log in"}</button>
+      </form>
+      <p className="ob-switch">
+        {mode === "create" ? "Already have an account? " : "New to Worldesk? "}
+        <button className="btn link" onClick={() => { setMode(mode === "create" ? "login" : "create"); setTouched(false); setError(""); }}>
+          {mode === "create" ? "Log in" : "Create an account"}
+        </button>
+      </p>
+      <p className="ob-note">Prototype: your account stays in this browser only. Passwords are never saved.</p>
+    </section>
+  );
+}
+
+function AboutStep({ profile, setProfile, onBack, onNext }: {
   profile: Profile; setProfile: (p: Profile) => void; onBack: () => void; onNext: () => void;
 }) {
   const set = <K extends keyof Profile>(k: K, v: Profile[K]) => setProfile({ ...profile, [k]: v });
-  const toggle = (t: string) =>
-    set("topics", profile.topics.includes(t) ? profile.topics.filter((x) => x !== t) : [...profile.topics, t]);
-  const valid = profile.name && profile.industry && profile.func;
-
+  const valid = profile.title.trim() && profile.func && profile.industry;
   return (
-    <section className="step">
+    <section className="ob">
       <BrandBanner />
-      <div className="step-head">
-        <div className="kicker">Step 1 of 2</div>
-        <h2>Tell us about your work</h2>
-        <p className="muted small">Your briefing is ranked by what affects your role. We never ask for your employer or contacts.</p>
-      </div>
-      <div className="grid2">
-        <div className="field"><label>First name</label>
-          <input value={profile.name} onChange={(e) => set("name", e.target.value)} placeholder="Maya" /></div>
-        <div className="field"><label>Job title</label>
-          <input value={profile.title} onChange={(e) => set("title", e.target.value)} placeholder="Marketing Director, APAC" /></div>
-        <div className="field"><label>Industry</label>
-          <select value={profile.industry} onChange={(e) => set("industry", e.target.value)}>
-            <option value="">Select…</option>{INDUSTRIES.map((i) => <option key={i}>{i}</option>)}
-          </select></div>
-        <div className="field"><label>Function</label>
-          <select value={profile.func} onChange={(e) => set("func", e.target.value)}>
-            <option value="">Select…</option>{FUNCTIONS.map((i) => <option key={i}>{i}</option>)}
-          </select></div>
-        <div className="field"><label>Home country</label>
-          <input value={profile.homeCountry} onChange={(e) => set("homeCountry", e.target.value)} placeholder="United States" /></div>
-        <div className="field"><label>Age range (optional)</label>
-          <select value={profile.ageRange} onChange={(e) => set("ageRange", e.target.value)}>
-            {AGE_RANGES.map((i) => <option key={i}>{i}</option>)}
-          </select></div>
-      </div>
-      <div className="field"><span className="label">Topics to follow</span>
-        <div className="chips">
-          {TOPICS.map((t) => (
-            <button key={t} aria-pressed={profile.topics.includes(t)} className={`chip ${profile.topics.includes(t) ? "on" : ""}`} onClick={() => toggle(t)}>{t}</button>
-          ))}
+      <StepHead n={2} title="About you" sub="We use this to order stories for your role and industry." />
+      <div className="ob-form">
+        <div className="field">
+          <label htmlFor="ab-title">Job title</label>
+          <input id="ab-title" value={profile.title} onChange={(e) => set("title", e.target.value)} placeholder="e.g. Marketing Director, APAC" />
+        </div>
+        <div className="grid2">
+          <div className="field">
+            <label htmlFor="ab-func">Function</label>
+            <select id="ab-func" value={profile.func} onChange={(e) => set("func", e.target.value)}>
+              <option value="">Select…</option>{FUNCTIONS.map((i) => <option key={i}>{i}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="ab-ind">Industry</label>
+            <select id="ab-ind" value={profile.industry} onChange={(e) => set("industry", e.target.value)}>
+              <option value="">Select…</option>{INDUSTRIES.map((i) => <option key={i}>{i}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="field">
+          <label htmlFor="ab-co">Company (optional)</label>
+          <input id="ab-co" value={profile.company} onChange={(e) => set("company", e.target.value)} placeholder="e.g. Acme Motors" />
         </div>
       </div>
       <div className="actions">
@@ -346,117 +438,64 @@ function ProfileStep({ profile, setProfile, onBack, onNext }: {
   );
 }
 
-// Market pin per country, in the order PINS was generated (see lib/worldDots.ts).
-const COUNTRY_PIN: Record<string, number> = { Germany: 0, France: 1, Japan: 2, "South Korea": 3, China: 4, Brazil: 5, Mexico: 6 };
-const PLANE = "M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z";
-
-function arc([x1, y1]: [number, number], [x2, y2]: [number, number]) {
-  const lift = Math.max(6, Math.hypot(x2 - x1, y2 - y1) * 0.28);
-  return `M${x1},${y1} Q${(x1 + x2) / 2},${Math.min(y1, y2) - lift} ${x2},${y2}`;
-}
-
-// Night-flight banner: the user's stops drawn as routes on the dotted world map, with a plane flying the first leg.
-function FlightBanner({ legs }: { legs: Leg[] }) {
-  const dots = useMemo(() => dotPath(DOTS, 0.32), []);
-  const stops = legs.filter((l) => l.country in COUNTRY_PIN);
-  const pts = stops.map((l) => PINS[COUNTRY_PIN[l.country]]);
-  const route: [number, number][] = pts.length >= 2 ? pts : [PINS[6], PINS[0], PINS[2]]; // sample route until two stops exist
-  const paths = route.slice(1).map((p, i) => arc(route[i], p)).filter((d, i) => route[i][0] !== route[i + 1][0] || route[i][1] !== route[i + 1][1]);
-  const [still] = useState(() => {
-    try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return true; }
-  });
-  const sample = pts.length < 2;
-  // Centre the view on the route so both ends survive the side crop on narrow screens.
-  const xs = route.map(([x]) => x);
-  const vbX = Math.max(-15, Math.min(15, (Math.min(...xs) + Math.max(...xs)) / 2 - 73.5));
-  const label = stops.length ? stops.map((l) => l.city).join(" → ") : "Add your first city below";
-
+function MarketsStep({ profile, setProfile, onBack, onNext }: {
+  profile: Profile; setProfile: React.Dispatch<React.SetStateAction<Profile>>; onBack: () => void; onNext: () => void;
+}) {
+  const toggle = (c: string) => setProfile((p) => ({
+    ...p,
+    markets: p.markets.includes(c) ? p.markets.filter((x) => x !== c) : [...p.markets, c],
+  }));
   return (
-    <div className="flight-banner" aria-hidden="true">
-      <svg viewBox={`${vbX} 4 147 58`} preserveAspectRatio="xMidYMid slice">
-        <path d={dots} className="fb-dots" />
-        {paths.map((d, i) => <path key={i} d={d} className={`fb-route ${sample ? "sample" : ""}`} />)}
-        {route.map(([x, y], i) => (
-          <g key={i} className={sample ? "sample" : ""}>
-            <circle cx={x} cy={y} r="1.9" className="fb-halo" />
-            <circle cx={x} cy={y} r="0.85" className="fb-pin" />
-          </g>
-        ))}
-        {paths[0] && (
-          <g className="fb-plane">
-            {still ? (
-              <g transform={(() => { const [a, b] = [route[0], route[1]]; return `translate(${(a[0] + b[0]) / 2},${Math.min(a[1], b[1]) - Math.max(6, Math.hypot(b[0] - a[0], b[1] - a[1]) * 0.28) / 2}) rotate(90) scale(0.26) translate(-12,-12)`; })()}>
-                <path d={PLANE} />
-              </g>
-            ) : (
-              <g>
-                <g transform="rotate(90) scale(0.26) translate(-12,-12)"><path d={PLANE} /></g>
-                <animateMotion dur="7s" repeatCount="indefinite" rotate="auto" path={paths[0]} keyPoints="0;1" keyTimes="0;1" calcMode="spline" keySplines="0.45 0 0.55 1" />
-              </g>
-            )}
-          </g>
-        )}
-      </svg>
-      <div className="fb-text">
-        <div className="fb-label">{sample ? "Sample route" : "Your route"}</div>
-        <div className="fb-route-text">{label}</div>
+    <section className="ob">
+      <StepHead n={3} title="Choose your markets" sub="Your briefing will only show stories from the countries you select." />
+      <div className="pick-grid markets">
+        {ONBOARD_MARKETS.map((m) => {
+          const on = profile.markets.includes(m.country);
+          return (
+            <button key={m.code} className={`pick ${on ? "on" : ""}`} role="checkbox" aria-checked={on} onClick={() => toggle(m.country)}>
+              <span className="pick-code">{m.code}</span>
+              <span className="pick-box" aria-hidden="true" />
+              <span className="pick-name">{m.country}</span>
+              <span className="pick-sub">{m.outlets[0].name}{m.language !== "English" ? ` · in ${m.language}` : ""}</span>
+            </button>
+          );
+        })}
       </div>
-    </div>
+      <div className="actions">
+        <button className="btn link" onClick={onBack}>Back</button>
+        <span className="row" style={{ gap: 14 }}>
+          <span className="small muted">{profile.markets.length} selected</span>
+          <button className="btn" disabled={!profile.markets.length} onClick={onNext}>Continue</button>
+        </span>
+      </div>
+    </section>
   );
 }
 
-function TripStep({ legs, setLegs, onBack, onNext }: {
-  legs: Leg[]; setLegs: (l: Leg[]) => void; onBack: () => void; onNext: () => void;
+function TopicsStep({ profile, setProfile, onBack, onNext }: {
+  profile: Profile; setProfile: React.Dispatch<React.SetStateAction<Profile>>; onBack: () => void; onNext: () => void;
 }) {
-  const update = (id: string, patch: Partial<Leg>) => setLegs(legs.map((l) => (l.id === id ? { ...l, ...patch } : l)));
-  const valid = legs.length > 0 && legs.every((l) => l.city && l.arrive && l.depart && l.depart >= l.arrive);
-  const finish = () => { setLegs([...legs].sort((a, b) => a.arrive.localeCompare(b.arrive))); onNext(); };
-
+  const toggle = (t: string) => setProfile((p) => ({
+    ...p,
+    topics: p.topics.includes(t) ? p.topics.filter((x) => x !== t) : [...p.topics, t],
+  }));
   return (
-    <section className="step">
-      <FlightBanner legs={legs} />
-      <div className="step-head">
-        <div className="kicker">Step 2 of 2</div>
-        <h2>Where are you headed?</h2>
-        <p className="muted small">Add each city on your trip. Covering {MARKETS.length} markets in this preview.</p>
+    <section className="ob">
+      <StepHead n={4} title="Choose topics" sub="Optional. Selected topics appear first in your briefing." />
+      <div className="pick-grid topics">
+        {TOPICS.map((t) => {
+          const on = profile.topics.includes(t);
+          return (
+            <button key={t} className={`pick row-pick ${on ? "on" : ""}`} role="checkbox" aria-checked={on} onClick={() => toggle(t)}>
+              <span className="pick-box" aria-hidden="true" />
+              <span className="pick-name">{t}</span>
+            </button>
+          );
+        })}
       </div>
-      {legs.map((leg, i) => {
-        const market = marketFor(leg.country);
-        return (
-          <div className="leg" key={leg.id}>
-            <div className="leg-num">Stop {i + 1}</div>
-            {legs.length > 1 && <button className="remove" onClick={() => setLegs(legs.filter((l) => l.id !== leg.id))}>Remove</button>}
-            <div className="field"><label>City</label>
-              <select value={leg.city} onChange={(e) => {
-                const c = CITIES.find((x) => x.city === e.target.value);
-                update(leg.id, { city: c?.city ?? "", country: c?.country ?? "" });
-              }}>
-                <option value="">Select a city…</option>
-                {MARKETS.map((m) => (
-                  <optgroup key={m.country} label={m.country}>
-                    {m.cities.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </optgroup>
-                ))}
-              </select>
-            </div>
-            {market && (
-              <p className="sources-line">
-                Sourced in {market.language} from <b>{market.outlets.map((o) => o.name).join(" · ")}</b>
-              </p>
-            )}
-            <div className="grid2">
-              <div className="field"><label>Arrive</label>
-                <input type="date" value={leg.arrive} onChange={(e) => update(leg.id, { arrive: e.target.value })} /></div>
-              <div className="field"><label>Depart</label>
-                <input type="date" value={leg.depart} min={leg.arrive} onChange={(e) => update(leg.id, { depart: e.target.value })} /></div>
-            </div>
-          </div>
-        );
-      })}
-      {legs.length < 4 && <button className="btn ghost" onClick={() => setLegs([...legs, newLeg()])}>+ Add another city</button>}
       <div className="actions">
         <button className="btn link" onClick={onBack}>Back</button>
-        <button className="btn" disabled={!valid} onClick={finish}>Build my briefing</button>
+        <button className="btn" onClick={onNext}>Build my briefing</button>
       </div>
     </section>
   );
@@ -467,14 +506,13 @@ type Alerts = { push: boolean; time: string; breaking: boolean };
 const ALERT_DEFAULT: Alerts = { push: false, time: "07:00", breaking: true };
 const TIMEOUT_MS = 110_000;
 
-function daysUntil(leg: Leg) {
-  return Math.round((Date.parse(leg.arrive) - Date.parse(iso(new Date()))) / 86400000);
-}
+const STORY_COUNT = 6;
 
-function BriefingView({ profile, legs }: { profile: Profile; legs: Leg[] }) {
-  const stages = useMemo(() => stagesFor(legs), [legs]);
-  const defaultLeg = legs.find((l) => stages[l.id] === "now" || stages[l.id] === "next") ?? legs[0];
-  const [sel, setSel] = useState(defaultLeg?.id);
+function BriefingView({ profile }: { profile: Profile }) {
+  const legs = useMemo(() => legsFor(profile.markets), [profile.markets]);
+  // No topics chosen means no restriction: offer every topic as a filter.
+  const topicList = profile.topics.length ? profile.topics : TOPICS;
+  const [sel, setSel] = useState(legs[0]?.id);
   const [filter, setFilter] = useState("top");
   const [feeds, setFeeds] = useState<Record<string, Feed>>({});
   // Loading is tracked per city AND per filter, so one slow request never blocks another.
@@ -498,7 +536,8 @@ function BriefingView({ profile, legs }: { profile: Profile; legs: Leg[] }) {
     save("wd.seen", [...all].slice(-500));
   }, [feeds]);
 
-  const cacheKey = (leg: Leg) => `wd.feed.${leg.city}.${profile.industry}.${profile.func}.${profile.topics.join(",")}.${iso(new Date())}`;
+  const cacheKey = (leg: Leg) =>
+    `wd.feed.${leg.country}.${profile.industry}.${profile.func}.${profile.company}.${profile.topics.join(",")}.${iso(new Date())}`;
   const bkey = (leg: Leg, f: string) => `${leg.id}|${f}`;
 
   const fetchMore = async (leg: Leg, f: string, reset = false) => {
@@ -516,7 +555,7 @@ function BriefingView({ profile, legs }: { profile: Profile; legs: Leg[] }) {
         method: "POST", headers: { "Content-Type": "application/json" }, signal: ctrl.signal,
         body: JSON.stringify({
           profile, leg,
-          count: f === "top" ? STORY_COUNT[stages[leg.id]] : 5,
+          count: f === "top" ? STORY_COUNT : 5,
           topic: f === "top" ? undefined : f,
           exclude: existing?.articles.map((a) => a.url) ?? [],
         }),
@@ -542,9 +581,8 @@ function BriefingView({ profile, legs }: { profile: Profile; legs: Leg[] }) {
         if (json.source === "live") save(cacheKey(leg), next);
         return { ...all, [leg.id]: next };
       });
-      // Preload the reader's own topics for the city that matters most, so topic taps are instant.
-      const st = stages[leg.id];
-      if (f === "top" && (st === "now" || st === "next")) {
+      // Preload the reader's own topics for the market that's open, so topic taps are instant.
+      if (f === "top" && !reset) {
         // wait a tick so feedsRef includes the top stories and they're excluded from topic results
         setTimeout(() => profile.topics.forEach((t) => fetchMore(leg, t)), 50);
       }
@@ -558,21 +596,22 @@ function BriefingView({ profile, legs }: { profile: Profile; legs: Leg[] }) {
     }
   };
 
+  // Markets load when their tab is opened (cached for the day), so picking 12 markets doesn't start 12 searches.
+  const open = (l: Leg) => {
+    if (feedsRef.current[l.id]) return;
+    const cached = load<Feed | null>(cacheKey(l), null);
+    if (cached) {
+      setFeeds((all) => ({ ...all, [l.id]: cached }));
+      profile.topics.filter((t) => !cached.fetched.includes(t)).forEach((t) => fetchMore(l, t));
+    } else fetchMore(l, "top");
+  };
   useEffect(() => {
-    legs.forEach((l) => {
-      const cached = load<Feed | null>(cacheKey(l), null);
-      if (cached) {
-        setFeeds((all) => ({ ...all, [l.id]: cached }));
-        const st = stages[l.id];
-        if (st === "now" || st === "next") profile.topics.filter((t) => !cached.fetched.includes(t)).forEach((t) => fetchMore(l, t));
-      } else fetchMore(l, "top");
-    });
+    if (legs[0]) open(legs[0]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const leg = legs.find((l) => l.id === sel) ?? legs[0];
-  if (!leg) return null;
-  const stage = stages[leg.id];
+  if (!leg) return <p className="muted" style={{ paddingTop: 32 }}>Choose at least one market to build your briefing.</p>;
   const market = marketFor(leg.country);
   const feed = feeds[leg.id];
   const k = bkey(leg, filter);
@@ -594,10 +633,8 @@ function BriefingView({ profile, legs }: { profile: Profile; legs: Leg[] }) {
 
   // Push notification: readable on its own; tapping it opens this city and scrolls to the story.
   const notify = (l: Leg, a: Article | undefined) => {
-    const days = daysUntil(l);
-    const when = stages[l.id] === "now" ? "today" : days === 1 ? "tomorrow" : `in ${days} days`;
-    const n = new Notification(`${l.city} · ${when}`, {
-      body: a ? `${a.outlet}: ${a.english_headline}\n${a.why_it_matters}`.slice(0, 220) : `Your ${l.city} briefing is ready.`,
+    const n = new Notification(`${l.country} · today's briefing`, {
+      body: a ? `${a.outlet}: ${a.english_headline}\n${a.why_it_matters}`.slice(0, 220) : `Your ${l.country} briefing is ready.`,
       tag: `worldesk-${l.id}`,
     });
     n.onclick = () => {
@@ -632,33 +669,32 @@ function BriefingView({ profile, legs }: { profile: Profile; legs: Leg[] }) {
   return (
     <section>
       <div className="greet">
-        <div className="kicker">Your trip briefing</div>
-        <h1>Good {hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening"}, {profile.name || "there"}.</h1>
+        <div className="kicker">Your briefing</div>
+        <h1>Good {hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening"}, {profile.name.split(" ")[0] || "there"}.</h1>
         <p className="muted small" style={{ margin: "4px 0 0" }}>
           Tuned for {profile.func.toLowerCase()} in {profile.industry.toLowerCase()}
           {profile.topics.length ? `, following ${profile.topics.join(", ").toLowerCase()}` : ""}.
         </p>
       </div>
 
-      <nav className="timeline" aria-label="Itinerary">
+      <nav className="timeline markets-nav" aria-label="Your markets">
         {legs.map((l) => {
-          const s = stages[l.id];
+          const m = marketFor(l.country);
+          const n = feeds[l.id]?.articles.length ?? 0;
           return (
-            <button key={l.id} className={`stop ${s} ${l.id === leg.id ? "sel" : ""}`} onClick={() => { setSel(l.id); setFilter("top"); }}>
-              <span className={`stage ${s}`}>{countdown(l, s)}</span>
-              <span className="city">{l.city}</span>
-              <span className="dates">{fmt(l.arrive)} to {fmt(l.depart)}</span>
-              <span className="depth">{s === "now" || s === "next" ? "Full briefing" : s === "later" ? "Preview" : "Recap"}</span>
+            <button key={l.id} className={`stop next ${l.id === leg.id ? "sel" : ""}`} aria-current={l.id === leg.id}
+              onClick={() => { setSel(l.id); setFilter("top"); open(l); }}>
+              <span className="stage next">{m?.code}</span>
+              <span className="city">{l.country}</span>
+              <span className="depth">{n ? `${n} stories` : l.id === leg.id ? "Loading…" : "Tap to load"}</span>
             </button>
           );
         })}
       </nav>
 
       <div className="city-head">
-        <div className="kicker">
-          {stage === "now" || stage === "next" ? "Full briefing" : stage === "later" ? "Preview · expands as you get closer" : "Trip recap"}
-        </div>
-        <h2>{leg.city}, {leg.country}</h2>
+        <div className="kicker">Business news · {leg.city}</div>
+        <h2>{leg.country}</h2>
         {market && (
           <div className="city-sub">
             Read in {market.language} from {market.outlets.map((o) => o.name).join(", ")}
@@ -673,13 +709,13 @@ function BriefingView({ profile, legs }: { profile: Profile; legs: Leg[] }) {
         )}
       </div>
 
-      {stage !== "past" && (
+      {(
         <div className="alert-card">
           {!alerts.push ? (
             <div className="alert-row">
               <div>
                 <b>Get this briefing on your phone</b>
-                <div className="small muted">A morning push with the top {leg.city} story, more often as your trip gets closer.</div>
+                <div className="small muted">A morning push with the top {leg.country} story, plus breaking news on your topics.</div>
               </div>
               <button className="btn small-btn" onClick={turnOn}>Turn on alerts</button>
             </div>
@@ -703,7 +739,7 @@ function BriefingView({ profile, legs }: { profile: Profile; legs: Leg[] }) {
               </div>
               <label className="check">
                 <input type="checkbox" checked={alerts.breaking} onChange={(e) => saveAlerts({ ...alerts, breaking: e.target.checked })} />
-                <span>Breaking alerts, only for {profile.topics.length ? profile.topics.join(", ") : "my topics"}</span>
+                <span>Breaking alerts, only for {topicList.join(", ")}</span>
               </label>
               <div className="row" style={{ marginTop: 12 }}>
                 <button className="btn ghost small-btn" onClick={testAlert}>Send test alert</button>
@@ -720,7 +756,7 @@ function BriefingView({ profile, legs }: { profile: Profile; legs: Leg[] }) {
 
       <div className="filters" role="tablist" aria-label="Filter stories">
         <button role="tab" aria-selected={filter === "top"} className={`chip ${filter === "top" ? "on" : ""}`} onClick={() => pick("top")}>Top stories</button>
-        {profile.topics.map((t) => {
+        {topicList.map((t) => {
           const loadingT = !!busy[bkey(leg, t)];
           return (
             <button key={t} role="tab" aria-selected={filter === t} className={`chip ${filter === t ? "on" : ""}`} onClick={() => pick(t)}>
@@ -736,7 +772,7 @@ function BriefingView({ profile, legs }: { profile: Profile; legs: Leg[] }) {
       )}
       {feed?.note && filter === "top" && (
         <div className="summary">
-          <div className="summary-label">This week in {leg.city}</div>
+          <div className="summary-label">This week in {leg.country}</div>
           <p>{feed.note}</p>
         </div>
       )}
@@ -757,7 +793,7 @@ function BriefingView({ profile, legs }: { profile: Profile; legs: Leg[] }) {
       {visible.map((a, i) => (
         <article key={a.url} data-url={a.url} className={`story ${i === 0 && filter === "top" ? "lead" : ""}`}>
           <div className="story-meta">
-            <button className="tag" onClick={() => profile.topics.includes(a.category) && pick(a.category)}>{a.category}</button>
+            <button className="tag" onClick={() => topicList.includes(a.category) && pick(a.category)}>{a.category}</button>
             {isNew(a.url) && <span className="new">New</span>}
             <span className="outlet">{a.outlet}</span>
             {a.date && <span>{fmt(a.date.slice(0, 10))}</span>}
@@ -829,13 +865,13 @@ function Progress({ startedAt, leg, profile, topic, compact }: {
         <text x="34" y="39" textAnchor="middle" fontSize="15" fontWeight="600" fill="var(--ink)">{pct}%</text>
       </svg>
       <div>
-        <div className="progress-title">Building your {leg.city} {topic ? topic : "briefing"}</div>
+        <div className="progress-title">Building your {leg.country} {topic ? topic : "briefing"}</div>
         <ol className="progress-steps">
           {steps.map((s, i) => (
             <li key={i} className={i < cur ? "done" : i === cur ? "on" : ""}>{i < cur ? "✓ " : ""}{s.text}</li>
           ))}
         </ol>
-        <div className="small muted">Usually 20–40 seconds. You can switch topics or cities meanwhile.</div>
+        <div className="small muted">Usually 20–40 seconds. You can switch topics or markets meanwhile.</div>
       </div>
     </div>
   );

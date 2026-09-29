@@ -143,3 +143,13 @@ Merged the design branch into main, ran a production build, and deployed to Verc
 **Prompt** (translated from chinese):
 
 > Merge to main and then deploy to Vercel.
+
+## Iterate after launch
+
+### 16. Redesign onboarding into four steps
+
+Following four reference screens but in Worldesk's own colors: Create your account → About you → Choose your markets (12 countries) → Choose topics → "Build my briefing". The trip step was removed; the briefing now has one tab per market. Added trusted outlets for 7 new markets, and the optional company makes "Why it matters to you" specific to the user's employer.
+
+**Prompt** (translated from Chinese, abridged):
+
+> I want to change Worldesk's onboarding. After I tap "Set up my briefing", split the old "Tell us about your work" page into several steps, like the four reference images: first "Create your account" (name, email, password, or "Log in"); then "About you" (job title, function, industry, company); then "Choose your markets", using the countries in the example; then "Choose topics" (regulation and policy, competitors, market and economy, consumer trends, labor, trade and tariffs, technology). Remove the "Where are you headed?" page, so after these steps you go straight to "Build my briefing". Keep the layouts from the references, but keep Worldesk's original colors, not the dark background in the images.

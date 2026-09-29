@@ -5,6 +5,8 @@ export type Outlet = { name: string; domain: string; note: string };
 
 export type Market = {
   country: string;
+  code: string; // shown on the market picker
+  hub: string; // main business city, used to frame the search
   language: string;
   cities: string[];
   outlets: Outlet[];
@@ -13,6 +15,8 @@ export type Market = {
 export const MARKETS: Market[] = [
   {
     country: "Germany",
+    code: "DE",
+    hub: "Frankfurt",
     language: "German",
     cities: ["Munich", "Berlin", "Frankfurt", "Stuttgart", "Hamburg"],
     outlets: [
@@ -24,6 +28,8 @@ export const MARKETS: Market[] = [
   },
   {
     country: "Japan",
+    code: "JP",
+    hub: "Tokyo",
     language: "Japanese",
     cities: ["Tokyo", "Osaka", "Nagoya", "Yokohama"],
     outlets: [
@@ -36,6 +42,8 @@ export const MARKETS: Market[] = [
   },
   {
     country: "Brazil",
+    code: "BR",
+    hub: "São Paulo",
     language: "Portuguese",
     cities: ["São Paulo", "Rio de Janeiro", "Brasília"],
     outlets: [
@@ -46,6 +54,8 @@ export const MARKETS: Market[] = [
   },
   {
     country: "France",
+    code: "FR",
+    hub: "Paris",
     language: "French",
     cities: ["Paris", "Lyon"],
     outlets: [
@@ -56,6 +66,8 @@ export const MARKETS: Market[] = [
   },
   {
     country: "Mexico",
+    code: "MX",
+    hub: "Mexico City",
     language: "Spanish",
     cities: ["Mexico City", "Monterrey", "Guadalajara"],
     outlets: [
@@ -66,6 +78,8 @@ export const MARKETS: Market[] = [
   },
   {
     country: "South Korea",
+    code: "KR",
+    hub: "Seoul",
     language: "Korean",
     cities: ["Seoul", "Busan"],
     outlets: [
@@ -76,6 +90,8 @@ export const MARKETS: Market[] = [
   },
   {
     country: "China",
+    code: "CN",
+    hub: "Shanghai",
     language: "Chinese",
     cities: ["Shanghai", "Beijing", "Shenzhen"],
     outlets: [
@@ -83,16 +99,105 @@ export const MARKETS: Market[] = [
       { name: "Yicai", domain: "yicai.com", note: "Business daily" },
     ],
   },
+  {
+    country: "United States",
+    code: "US",
+    hub: "New York",
+    language: "English",
+    cities: ["New York", "San Francisco", "Chicago", "Washington"],
+    outlets: [
+      { name: "The Wall Street Journal", domain: "wsj.com", note: "Leading business daily" },
+      { name: "The New York Times", domain: "nytimes.com", note: "National daily of record" },
+      { name: "The Washington Post", domain: "washingtonpost.com", note: "National daily" },
+    ],
+  },
+  {
+    country: "United Kingdom",
+    code: "UK",
+    hub: "London",
+    language: "English",
+    cities: ["London", "Manchester", "Edinburgh"],
+    outlets: [
+      { name: "Financial Times", domain: "ft.com", note: "Leading business daily" },
+      { name: "The Guardian", domain: "theguardian.com", note: "National daily" },
+      { name: "BBC News", domain: "bbc.co.uk", note: "Public broadcaster" },
+    ],
+  },
+  {
+    country: "Australia",
+    code: "AU",
+    hub: "Sydney",
+    language: "English",
+    cities: ["Sydney", "Melbourne"],
+    outlets: [
+      { name: "Australian Financial Review", domain: "afr.com", note: "Leading business daily" },
+      { name: "The Sydney Morning Herald", domain: "smh.com.au", note: "Metropolitan daily" },
+      { name: "ABC News", domain: "abc.net.au", note: "Public broadcaster" },
+    ],
+  },
+  {
+    country: "India",
+    code: "IN",
+    hub: "Mumbai",
+    language: "English",
+    cities: ["Mumbai", "New Delhi", "Bengaluru"],
+    outlets: [
+      { name: "The Economic Times", domain: "economictimes.indiatimes.com", note: "Leading business daily" },
+      { name: "Mint", domain: "livemint.com", note: "Business daily" },
+      { name: "Business Standard", domain: "business-standard.com", note: "Business daily" },
+      { name: "The Hindu", domain: "thehindu.com", note: "National daily" },
+    ],
+  },
+  {
+    country: "Canada",
+    code: "CA",
+    hub: "Toronto",
+    language: "English",
+    cities: ["Toronto", "Vancouver", "Montreal"],
+    outlets: [
+      { name: "The Globe and Mail", domain: "theglobeandmail.com", note: "National daily" },
+      { name: "Financial Post", domain: "financialpost.com", note: "Business daily" },
+      { name: "CBC News", domain: "cbc.ca", note: "Public broadcaster" },
+    ],
+  },
+  {
+    country: "Singapore",
+    code: "SG",
+    hub: "Singapore",
+    language: "English",
+    cities: ["Singapore"],
+    outlets: [
+      { name: "The Straits Times", domain: "straitstimes.com", note: "National daily" },
+      { name: "The Business Times", domain: "businesstimes.com.sg", note: "Business daily" },
+      { name: "CNA", domain: "channelnewsasia.com", note: "Broadcaster" },
+    ],
+  },
+  {
+    country: "UAE",
+    code: "AE",
+    hub: "Dubai",
+    language: "English",
+    cities: ["Dubai", "Abu Dhabi"],
+    outlets: [
+      { name: "The National", domain: "thenationalnews.com", note: "Abu Dhabi-based daily" },
+      { name: "Gulf News", domain: "gulfnews.com", note: "Dubai-based daily" },
+      { name: "Khaleej Times", domain: "khaleejtimes.com", note: "Dubai-based daily" },
+    ],
+  },
 ];
 
-export const CITIES = MARKETS.flatMap((m) => m.cities.map((city) => ({ city, country: m.country })));
+// Markets offered in onboarding, in picker order.
+export const ONBOARD_MARKETS = ["US", "UK", "DE", "JP", "AU", "FR", "IN", "BR", "CN", "CA", "SG", "AE"]
+  .map((code) => MARKETS.find((m) => m.code === code)!)
+  .filter(Boolean);
+
 
 export function marketFor(country: string): Market | undefined {
   return MARKETS.find((m) => m.country === country);
 }
 
-// English-language editions hosted on otherwise local domains. The product promise
-// is local-language reporting, so these are rejected even though the domain is trusted.
+// English-language editions hosted on otherwise local domains. For non-English markets the
+// promise is local-language reporting, so these are rejected even though the domain is trusted.
 const ENGLISH_EDITIONS = [/^(en|english)\./, /^asia\.nikkei\.com$/, /^www\.caixinglobal\.com$/];
 const ENGLISH_PATHS = [/\/nhkworld\//, /\/english\//, /\/en\//];
 

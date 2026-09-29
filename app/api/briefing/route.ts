@@ -50,23 +50,32 @@ async function search({ profile, leg, count: wanted, topic, exclude }: Req, rece
 
   const system = `You are the foreign desk editor of Worldesk, a briefing service for international business executives.
 You ONLY use articles published by these trusted ${market.country} outlets: ${outlets}.
-Write every search query in ${market.language}, the way a local reader would, and use only ${market.language}-language articles. Never use English-language editions (e.g. NHK World, Nikkei Asia, "/en/" pages). Never invent articles, headlines or URLs: every url must be the exact article URL from your search results.
+Write every search query in ${market.language}, the way a local reader would, and use only ${market.language}-language articles.${
+    market.language === "English" ? "" : ` Never use English-language editions (e.g. NHK World, Nikkei Asia, "/en/" pages).`
+  } Never invent articles, headlines or URLs: every url must be the exact article URL from your search results.
 At least half of the stories must be directly about the reader's industry; the rest may be the local economy or policy that affects it. If you do not have the exact original headline, return an empty string for original_headline rather than a placeholder. Skip opinion pieces, horoscopes, sports and celebrity news.`;
 
-  const user = `Reader: ${profile.title || "executive"} in ${profile.func} at a ${profile.industry} company, based in ${profile.homeCountry || "abroad"}.
+  const employer = profile.company?.trim() ? `${profile.company.trim()}, a ${profile.industry} company` : `a ${profile.industry} company`;
+  // Markets replaced trip stops in onboarding; older saved trips still carry dates.
+  const where = leg.arrive
+    ? `Trip: ${leg.city}, ${leg.country}, ${leg.arrive} to ${leg.depart}.`
+    : `Market they follow: ${leg.country} (main business hub: ${leg.city}).`;
+  const context = leg.arrive ? `before meetings in ${leg.city}` : `to do business in ${leg.country}`;
+
+  const user = `Reader: ${profile.title || "executive"} in ${profile.func} at ${employer}${profile.homeCountry ? `, based in ${profile.homeCountry}` : ""}.
 Topics they follow: ${profile.topics.join(", ") || "markets and economy"}.
-Trip: ${leg.city}, ${leg.country}, ${leg.arrive} to ${leg.depart}.
+${where}
 
 ${
     topic
-      ? `Find up to ${count} recent stories from the outlets above in the category "${topic}" that this reader should know before meetings in ${leg.city}. Every story must fit that category.`
-      : `Find up to ${count} recent stories from the outlets above that this reader should know before meetings in ${leg.city}. Cover the reader's topics: aim for at least one strong story per topic, then rank by relevance to their industry and function.`
+      ? `Find up to ${count} recent stories from the outlets above in the category "${topic}" that this reader should know ${context}. Every story must fit that category.`
+      : `Find up to ${count} recent stories from the outlets above that this reader should know ${context}. Cover the reader's topics: aim for at least one strong story per topic, then rank by relevance to their industry and function.`
   }
 Tag each story with exactly one category from: ${TOPICS.join(", ")}.${
     exclude.length ? `\nThe reader has already seen these, do NOT return them again:\n${exclude.slice(0, 40).join("\n")}` : ""
   }
-For each: outlet name, the original ${market.language} headline, an accurate English translation, publication date (YYYY-MM-DD), a 2-sentence English summary that keeps the local framing and tone, and one sentence "why it matters" addressed to this reader (concrete: which conversation or decision it affects).
-landing_note: one sentence on the overall business mood in ${leg.city} this week, based only on these stories.`;
+For each: outlet name, the original ${market.language} headline, an accurate English translation, publication date (YYYY-MM-DD), a 2-sentence English summary that keeps the local framing and tone, and one sentence "why it matters" addressed to this reader (concrete: which conversation or decision it affects${profile.company?.trim() ? `, for ${profile.company.trim()} specifically where possible` : ""}).
+landing_note: one sentence on the overall business mood in ${leg.arrive ? leg.city : leg.country} this week, based only on these stories.`;
 
   // Perplexity Agent API: https://docs.perplexity.ai/api-reference/agent-post
   const res = await fetch("https://api.perplexity.ai/v1/agent", {
@@ -127,7 +136,7 @@ function clean(
   for (const a of parsed.articles ?? []) {
     const outlet = outletForUrl(a.url, market);
     if (!outlet) continue; // trust rule: only whitelisted domains
-    if (isEnglishEdition(a.url)) continue; // local-language rule
+    if (market.language !== "English" && isEnglishEdition(a.url)) continue; // local-language rule
     const key = a.url.replace(/\/$/, "");
     if (seen.has(key)) continue;
     seen.add(key);

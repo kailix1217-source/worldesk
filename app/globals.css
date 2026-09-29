@@ -459,3 +459,43 @@ article.story[data-url] { padding: 24px 26px; margin-top: 18px; }
 .step .chips .chip.on { background: var(--signal); border-color: var(--signal); color: var(--ink); font-weight: 600; }
 .step .chips .chip.on::before { content: "✓"; margin-right: 6px; }
 .step .chips .chip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* ---------- v18: 4-step onboarding (account → about → markets → topics) ---------- */
+.ob-progress { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 18px 0 0; }
+.ob-progress i { height: 3px; border-radius: 999px; background: var(--fill); }
+.ob-progress i.on { background: var(--ink); }
+.ob { padding: 28px 0 8px; }
+.ob-narrow { max-width: 440px; margin: 0 auto; padding-top: 48px; }
+.ob-head { margin-bottom: 26px; }
+.ob-head.center { text-align: center; }
+.ob-head h1 { font-size: clamp(30px, 6vw, 40px); margin: 6px 0 8px; }
+.ob-head p { margin: 0; color: var(--muted); }
+.ob-form { display: flex; flex-direction: column; }
+.ob-full { width: 100%; margin-top: 6px; }
+.field-err { font-size: 12.5px; color: var(--danger); margin-top: 2px; }
+.ob-switch { text-align: center; color: var(--muted); margin: 22px 0 0; font-size: 14px; }
+.ob-switch .btn.link { padding: 0; color: var(--ink); font-weight: 600; }
+.ob-note { text-align: center; font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; color: var(--muted); margin: 18px 0 0; }
+
+.pick-grid { display: grid; gap: 12px; }
+.pick-grid.markets { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.pick-grid.topics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 600px) { .pick-grid.markets { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .pick-grid.topics { grid-template-columns: 1fr; } }
+.pick { position: relative; display: grid; grid-template-columns: 1fr auto; grid-template-areas: "code box" "name name" "sub sub";
+  row-gap: 6px; align-content: start; text-align: left; background: var(--paper-card); border: 1px solid var(--card-line); border-radius: 18px;
+  padding: 16px 16px 16px 18px; color: var(--ink); box-shadow: 0 8px 22px -18px rgba(20, 30, 50, 0.3); transition: border-color .15s, background .15s; }
+.pick:hover { border-color: #c9ccd3; }
+.pick:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.pick-code { grid-area: code; font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em; color: var(--muted); }
+.pick-name { grid-area: name; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; margin-top: 8px; }
+.pick-sub { grid-area: sub; font-size: 12px; color: var(--muted); }
+.pick-box { grid-area: box; width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid #9a9ea7; display: grid; place-items: center; }
+.pick.on { border-color: var(--signal); background: var(--signal-tint); }
+.pick.on .pick-box { background: var(--signal); border-color: var(--signal); }
+.pick.on .pick-box::after { content: "✓"; color: #fff; font-size: 13px; font-weight: 700; line-height: 1; }
+.row-pick { display: flex; align-items: center; gap: 14px; padding: 18px 20px; }
+.row-pick .pick-name { margin: 0; font-size: 16px; }
+
+.markets-nav .stop { flex: 1 0 150px; }
+.markets-nav .stage { font-size: 11px; }
