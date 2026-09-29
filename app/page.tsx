@@ -567,6 +567,87 @@ function StoryCard({ a, isNew, saved, onSave, onTag }: {
   );
 }
 
+type Indicator = { code: string; label: string; kind: "rate" | "usd" | "count"; value: number; year: string; prev?: number; prevYear?: string };
+
+function fmtValue(i: Indicator) {
+  if (i.kind === "rate") return `${i.value.toFixed(1)}%`;
+  const v = i.value;
+  const big = (n: number) =>
+    n >= 1e12 ? `${(n / 1e12).toFixed(2)}T` : n >= 1e9 ? `${(n / 1e9).toFixed(n >= 1e11 ? 0 : 1)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : Math.round(n).toLocaleString("en-US");
+  if (i.kind === "usd") return v >= 1e6 ? `$${big(v)}` : `$${Math.round(v).toLocaleString("en-US")}`;
+  return big(v);
+}
+// Rates change in percentage points; amounts change in percent.
+function fmtChange(i: Indicator) {
+  if (i.prev === undefined || i.prev === 0) return null;
+  const d = i.kind === "rate" ? i.value - i.prev : ((i.value - i.prev) / Math.abs(i.prev)) * 100;
+  const n = Math.abs(d) < 0.1 ? d.toFixed(2) : d.toFixed(1); // small moves (e.g. population) need two decimals
+  const text = `${d >= 0 ? "+" : ""}${n}${i.kind === "rate" ? " pp" : "%"}`;
+  return { up: d >= 0, text };
+}
+
+// World Bank key figures for one market, laid out like a market ticker.
+function IndicatorStrip({ country }: { country: string }) {
+  const m = marketFor(country);
+  const [data, setData] = useState<Indicator[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [edges, setEdges] = useState({ left: false, right: false });
+  const rail = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!m) return;
+    const key = `wd.ind.${m.iso3}.${iso(new Date())}`;
+    const cached = load<Indicator[] | null>(key, null);
+    if (cached) { setData(cached); return; }
+    fetch(`/api/indicators?iso=${m.iso3}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((j: { indicators: Indicator[] }) => { setData(j.indicators); save(key, j.indicators); })
+      .catch(() => setFailed(true));
+  }, [m]);
+
+  const measure = () => {
+    const el = rail.current;
+    if (el) setEdges({ left: el.scrollLeft > 4, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
+  };
+  useEffect(() => {
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [data]);
+  const nudge = (dir: number) => rail.current?.scrollBy({ left: dir * 260, behavior: "smooth" });
+
+  if (!m || failed) return null;
+  const wbLink = `https://data.worldbank.org/country/${m.code === "UK" ? "GB" : m.code}`;
+  return (
+    <section className="tk" aria-label={`${country} key figures from the World Bank`}>
+      <div className="tk-rail" ref={rail} onScroll={measure}>
+        {!data
+          ? [0, 1, 2, 3].map((i) => <span key={i} className="tk-item skel" style={{ width: 170, height: 18 }} />)
+          : data.map((i) => {
+              const ch = fmtChange(i);
+              return (
+                <div key={i.code} className="tk-item" title={ch ? `${i.year} vs ${i.prevYear}` : i.year}>
+                  <span className="tk-label">{i.label}</span>
+                  <b className="tk-value">{fmtValue(i)}</b>
+                  {ch && <span className={`tk-change ${ch.up ? "up" : "down"}`}>{ch.text} <span aria-hidden="true">{ch.up ? "↑" : "↓"}</span></span>}
+                  <span className="tk-year">{i.year}</span>
+                </div>
+              );
+            })}
+        <a className="tk-src" href={wbLink} target="_blank" rel="noopener noreferrer">World Bank ↗</a>
+      </div>
+      <div className="tk-nav">
+        <button onClick={() => nudge(-1)} disabled={!edges.left} aria-label="Scroll key figures left">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+        </button>
+        <button onClick={() => nudge(1)} disabled={!edges.right} aria-label="Scroll key figures right">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function BriefingView({ profile, demo, onEdit, onHome, onLogout, onExitDemo }: {
   profile: Profile; demo: boolean; onEdit: (s: Step) => void; onHome: () => void; onLogout: () => void; onExitDemo: () => void;
 }) {
@@ -826,6 +907,7 @@ function BriefingView({ profile, demo, onEdit, onHome, onLogout, onExitDemo }: {
               onClick={() => { setFilter("top"); fetchMore(leg, "top", true); }}>Refresh</button>
           </p>
         </header>
+        <IndicatorStrip country={leg.country} />
         {feed?.source === "sample" && (
           <div className="banner">Sample mode: no API key is configured, so these are placeholders. Live mode pulls real articles.</div>
         )}

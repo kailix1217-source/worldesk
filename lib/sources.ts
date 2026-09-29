@@ -9,6 +9,7 @@ export const domainsOf = (o: Outlet) => [o.domain, ...(o.also ?? [])];
 export type Market = {
   country: string;
   code: string; // shown on the market picker
+  iso3: string; // World Bank country code
   hub: string; // main business city, used to frame the search
   language: string;
   cities: string[];
@@ -19,6 +20,7 @@ export const MARKETS: Market[] = [
   {
     country: "Germany",
     code: "DE",
+    iso3: "DEU",
     hub: "Frankfurt",
     language: "German",
     cities: ["Munich", "Berlin", "Frankfurt", "Stuttgart", "Hamburg"],
@@ -33,6 +35,7 @@ export const MARKETS: Market[] = [
     // NHK, Nikkei, Asahi and Yomiuri return no Japanese-language articles through the search API
     // (only NHK World in English), so Japan uses the most authoritative outlets that are actually reachable.
     code: "JP",
+    iso3: "JPN",
     hub: "Tokyo",
     language: "Japanese",
     cities: ["Tokyo", "Osaka", "Nagoya", "Yokohama"],
@@ -45,6 +48,7 @@ export const MARKETS: Market[] = [
   {
     country: "Brazil",
     code: "BR",
+    iso3: "BRA",
     hub: "São Paulo",
     language: "Portuguese",
     cities: ["São Paulo", "Rio de Janeiro", "Brasília"],
@@ -57,6 +61,7 @@ export const MARKETS: Market[] = [
   {
     country: "France",
     code: "FR",
+    iso3: "FRA",
     hub: "Paris",
     language: "French",
     cities: ["Paris", "Lyon"],
@@ -69,6 +74,7 @@ export const MARKETS: Market[] = [
   {
     country: "Mexico",
     code: "MX",
+    iso3: "MEX",
     hub: "Mexico City",
     language: "Spanish",
     cities: ["Mexico City", "Monterrey", "Guadalajara"],
@@ -81,6 +87,7 @@ export const MARKETS: Market[] = [
   {
     country: "South Korea",
     code: "KR",
+    iso3: "KOR",
     hub: "Seoul",
     language: "Korean",
     cities: ["Seoul", "Busan"],
@@ -93,6 +100,7 @@ export const MARKETS: Market[] = [
   {
     country: "China",
     code: "CN",
+    iso3: "CHN",
     hub: "Shanghai",
     language: "Chinese",
     cities: ["Shanghai", "Beijing", "Shenzhen"],
@@ -105,6 +113,7 @@ export const MARKETS: Market[] = [
   {
     country: "United States",
     code: "US",
+    iso3: "USA",
     hub: "New York",
     language: "English",
     cities: ["New York", "San Francisco", "Chicago", "Washington"],
@@ -117,6 +126,7 @@ export const MARKETS: Market[] = [
   {
     country: "United Kingdom",
     code: "UK",
+    iso3: "GBR",
     hub: "London",
     language: "English",
     cities: ["London", "Manchester", "Edinburgh"],
@@ -129,6 +139,7 @@ export const MARKETS: Market[] = [
   {
     country: "Australia",
     code: "AU",
+    iso3: "AUS",
     hub: "Sydney",
     language: "English",
     cities: ["Sydney", "Melbourne"],
@@ -141,6 +152,7 @@ export const MARKETS: Market[] = [
   {
     country: "India",
     code: "IN",
+    iso3: "IND",
     hub: "Mumbai",
     language: "English",
     cities: ["Mumbai", "New Delhi", "Bengaluru"],
@@ -153,6 +165,7 @@ export const MARKETS: Market[] = [
   {
     country: "Canada",
     code: "CA",
+    iso3: "CAN",
     hub: "Toronto",
     language: "English",
     cities: ["Toronto", "Vancouver", "Montreal"],
@@ -165,6 +178,7 @@ export const MARKETS: Market[] = [
   {
     country: "Singapore",
     code: "SG",
+    iso3: "SGP",
     hub: "Singapore",
     language: "English",
     cities: ["Singapore"],
@@ -177,6 +191,7 @@ export const MARKETS: Market[] = [
   {
     country: "UAE",
     code: "AE",
+    iso3: "ARE",
     hub: "Dubai",
     language: "English",
     cities: ["Dubai", "Abu Dhabi"],

@@ -595,3 +595,23 @@ article.story[data-url] { padding: 24px 26px; margin-top: 18px; }
   .sc h3 { font-size: 19px; }
   .summary-rows li { font-size: 15px; }
 }
+
+/* ---------- v22: World Bank key-figures ticker (per market) ---------- */
+.tk { display: flex; align-items: stretch; background: var(--paper-card); border: 1px solid var(--card-line); border-radius: 14px; margin: -4px 0 18px; overflow: hidden; }
+.tk-rail { flex: 1; min-width: 0; display: flex; align-items: center; gap: 26px; padding: 12px 18px; overflow-x: auto; scrollbar-width: none; scroll-behavior: smooth; }
+.tk-rail::-webkit-scrollbar { display: none; }
+.tk-item { flex: 0 0 auto; display: inline-flex; align-items: baseline; gap: 7px; white-space: nowrap; font-size: 14px; }
+.tk-label { font-weight: 600; color: var(--ink); }
+.tk-value { font-variant-numeric: tabular-nums; color: var(--ink); }
+.tk-change { font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.tk-change.up { color: var(--ink-2); }
+.tk-change.down { color: var(--signal-text); }
+.tk-year { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; color: var(--muted); }
+.tk-src { flex: 0 0 auto; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); text-decoration: none; white-space: nowrap; }
+.tk-src:hover { color: var(--ink); }
+.tk-nav { display: flex; border-left: 1px solid var(--card-line); }
+.tk-nav button { width: 38px; border: 0; background: none; display: grid; place-items: center; color: var(--ink); }
+.tk-nav button:disabled { color: #c3c6cc; cursor: default; }
+.tk-nav button:not(:disabled):hover { background: var(--fill); }
+.tk-nav svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+@media (max-width: 640px) { .tk-nav { display: none; } .tk-rail { padding: 11px 14px; gap: 20px; } }
