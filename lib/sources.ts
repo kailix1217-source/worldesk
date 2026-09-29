@@ -108,6 +108,7 @@ export const MARKETS: Market[] = [
       { name: "Xinhua", domain: "news.cn", also: ["xinhuanet.com"], note: "State news agency" },
       { name: "People's Daily", domain: "people.com.cn", note: "Official national daily" },
       { name: "CCTV", domain: "cctv.com", note: "State broadcaster" },
+      { name: "Caixin", domain: "caixin.com", note: "Independent business and finance weekly" },
     ],
   },
   {

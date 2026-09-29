@@ -649,11 +649,10 @@ function IndicatorStrip({ country }: { country: string }) {
           : data.map((i) => {
               const ch = fmtChange(i);
               return (
-                <div key={i.code} className="tk-item" title={ch ? `${i.year} vs ${i.prevYear}` : i.year}>
+                <div key={i.code} className="tk-item" title={ch ? `${i.label}: ${i.year} vs ${i.prevYear} (World Bank)` : `${i.label}: ${i.year} (World Bank)`}>
                   <span className="tk-label">{i.label}</span>
                   <b className="tk-value">{fmtValue(i)}</b>
                   {ch && <span className={`tk-change ${ch.up ? "up" : "down"}`}>{ch.text} <span aria-hidden="true">{ch.up ? "↑" : "↓"}</span></span>}
-                  <span className="tk-year">{i.year}</span>
                 </div>
               );
             })}
