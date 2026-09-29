@@ -56,11 +56,20 @@ export const INDUSTRIES = [
 ];
 
 export const FUNCTIONS = [
+  "General Management",
+  "Strategy & Consulting",
   "Marketing & Communications",
   "Sales & Business Development",
-  "General Management",
+  "Product Management",
+  "Data & Analytics",
+  "Software & Engineering",
+  "Research & Analysis",
+  "Finance & Accounting",
   "M&A / Investment",
   "Operations & Supply Chain",
+  "Legal & Compliance",
+  "HR & People",
+  "Other",
 ];
 
 export const TOPICS = [

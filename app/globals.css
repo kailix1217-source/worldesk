@@ -501,7 +501,8 @@ article.story[data-url] { padding: 24px 26px; margin-top: 18px; }
 .markets-nav .stage { font-size: 11px; }
 
 /* v19: every onboarding step starts at the same height; the About you banner closes the page */
-.ob .brand-banner { margin: 36px 0 8px; }
+.ob .brand-banner { margin: 20px 0 8px; height: clamp(120px, 20vw, 170px); }
+.ob .brand-banner .bb-word { font-size: clamp(30px, 7.5cqi, 54px); }
 
 /* ---------- v21: briefing shell (sidebar + feed) and new story card ---------- */
 .bf { display: grid; grid-template-columns: 264px minmax(0, 1fr); min-height: 100vh; min-height: 100dvh; }

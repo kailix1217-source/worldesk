@@ -56,6 +56,9 @@ export default function Home() {
   const [profile, setProfile] = useState<Profile>(EMPTY_PROFILE);
   const [signedIn, setSignedIn] = useState(false);
   const [demo, setDemo] = useState(false); // the sample executive never overwrites the user's own account
+  // Editing from Settings reuses a setup screen as a single-step editor, then returns to Settings.
+  const [editFrom, setEditFrom] = useState<Profile | null>(null);
+  const [briefView, setBriefView] = useState<View>("all");
 
   useEffect(() => {
     const p = loadProfile();
@@ -67,7 +70,11 @@ export default function Home() {
   useEffect(() => { if (ready) { save("wd.profile", profile); save("wd.session", signedIn); } }, [ready, profile, signedIn]);
   useEffect(() => { window.scrollTo(0, 0); }, [step]);
 
-  const startDemo = () => { setDemo(true); setStep("briefing"); };
+  const openBriefing = (view: View = "all") => { setBriefView(view); setStep("briefing"); };
+  const startDemo = () => { setDemo(true); openBriefing(); };
+  const startEdit = (s: Step) => { setEditFrom(profile); setStep(s); };
+  const saveEdit = () => { setEditFrom(null); openBriefing("settings"); };
+  const cancelEdit = () => { if (editFrom) setProfile(editFrom); setEditFrom(null); openBriefing("settings"); };
   const exitDemo = () => { setDemo(false); setStep("welcome"); };
   const logOut = () => { setSignedIn(false); setStep("welcome"); };
 
@@ -79,7 +86,7 @@ export default function Home() {
     return (
       <Welcome
         returning={returning} name={profile.name.split(" ")[0]}
-        onStart={() => setStep(signedIn && hasAccount ? "about" : "account")} onOpen={() => setStep("briefing")}
+        onStart={() => setStep(signedIn && hasAccount ? "about" : "account")} onOpen={() => openBriefing()}
         onEdit={() => setStep("about")} onDemo={startDemo}
       />
     );
@@ -88,11 +95,12 @@ export default function Home() {
   if (step === "briefing") {
     return (
       <BriefingView key={demo ? "demo" : profile.markets.join(",")} profile={demo ? DEMO_PROFILE : profile} demo={demo}
-        onEdit={setStep} onHome={() => setStep("welcome")} onLogout={logOut} onExitDemo={exitDemo} />
+        initialView={briefView} onEdit={startEdit} onHome={() => setStep("welcome")} onLogout={logOut} onExitDemo={exitDemo} />
     );
   }
 
-  const stepNo = ONBOARDING.indexOf(step);
+  const stepNo = editFrom ? -1 : ONBOARDING.indexOf(step);
+  const edit = editFrom ? { onCancel: cancelEdit, onSave: saveEdit } : undefined;
   return (
     <main className="wrap">
       <header className="mast">
@@ -112,16 +120,16 @@ export default function Home() {
       {step === "account" && (
         <AccountStep profile={profile} setProfile={setProfile} initialMode={hasAccount && !signedIn ? "login" : "create"}
           onNext={() => { setSignedIn(true); setStep("about"); }}
-          onLoggedIn={(complete) => { setSignedIn(true); setStep(complete ? "briefing" : "about"); }} />
+          onLoggedIn={(complete) => { setSignedIn(true); if (complete) openBriefing(); else setStep("about"); }} />
       )}
       {step === "about" && (
-        <AboutStep profile={profile} setProfile={setProfile} onBack={() => setStep(hasAccount ? "welcome" : "account")} onNext={() => setStep("markets")} />
+        <AboutStep profile={profile} setProfile={setProfile} edit={edit} onBack={() => setStep(hasAccount ? "welcome" : "account")} onNext={() => setStep("markets")} />
       )}
       {step === "markets" && (
-        <MarketsStep profile={profile} setProfile={setProfile} onBack={() => setStep("about")} onNext={() => setStep("topics")} />
+        <MarketsStep profile={profile} setProfile={setProfile} edit={edit} onBack={() => setStep("about")} onNext={() => setStep("topics")} />
       )}
       {step === "topics" && (
-        <TopicsStep profile={profile} setProfile={setProfile} onBack={() => setStep("markets")} onNext={() => setStep("briefing")} />
+        <TopicsStep profile={profile} setProfile={setProfile} edit={edit} onBack={() => setStep("markets")} onNext={() => openBriefing()} />
       )}
     </main>
   );
@@ -300,10 +308,12 @@ function BrandBanner() {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function StepHead({ n, title, sub, center }: { n: number; title: string; sub: string; center?: boolean }) {
+type EditMode = { onCancel: () => void; onSave: () => void };
+
+function StepHead({ n, title, sub, center, editLabel }: { n: number; title: string; sub: string; center?: boolean; editLabel?: string }) {
   return (
     <div className={`ob-head ${center ? "center" : ""}`}>
-      <div className="kicker">Step {n} of 4</div>
+      <div className="kicker">{editLabel ?? `Step ${n} of 4`}</div>
       <h1>{title}</h1>
       <p>{sub}</p>
     </div>
@@ -388,14 +398,23 @@ function AccountStep({ profile, setProfile, initialMode, onNext, onLoggedIn }: {
   );
 }
 
-function AboutStep({ profile, setProfile, onBack, onNext }: {
-  profile: Profile; setProfile: (p: Profile) => void; onBack: () => void; onNext: () => void;
+function EditActions({ edit, canSave }: { edit: EditMode; canSave: boolean }) {
+  return (
+    <div className="actions">
+      <button className="btn link" onClick={edit.onCancel}>Cancel</button>
+      <button className="btn" disabled={!canSave} onClick={edit.onSave}>Save changes</button>
+    </div>
+  );
+}
+
+function AboutStep({ profile, setProfile, edit, onBack, onNext }: {
+  profile: Profile; setProfile: (p: Profile) => void; edit?: EditMode; onBack: () => void; onNext: () => void;
 }) {
   const set = <K extends keyof Profile>(k: K, v: Profile[K]) => setProfile({ ...profile, [k]: v });
   const valid = profile.title.trim() && profile.func && profile.industry;
   return (
     <section className="ob">
-      <StepHead n={2} title="About you" sub="We use this to order stories for your role and industry." />
+      <StepHead n={2} title="About you" sub="We use this to order stories for your role and industry." editLabel={edit && "Edit profile"} />
       <div className="ob-form">
         <div className="field">
           <label htmlFor="ab-title">Job title</label>
@@ -420,17 +439,19 @@ function AboutStep({ profile, setProfile, onBack, onNext }: {
           <input id="ab-co" value={profile.company} onChange={(e) => set("company", e.target.value)} placeholder="e.g. Acme Motors" />
         </div>
       </div>
-      <div className="actions">
-        <button className="btn link" onClick={onBack}>Back</button>
-        <button className="btn" disabled={!valid} onClick={onNext}>Continue</button>
-      </div>
+      {edit ? <EditActions edit={edit} canSave={!!valid} /> : (
+        <div className="actions">
+          <button className="btn link" onClick={onBack}>Back</button>
+          <button className="btn" disabled={!valid} onClick={onNext}>Continue</button>
+        </div>
+      )}
       <BrandBanner />
     </section>
   );
 }
 
-function MarketsStep({ profile, setProfile, onBack, onNext }: {
-  profile: Profile; setProfile: React.Dispatch<React.SetStateAction<Profile>>; onBack: () => void; onNext: () => void;
+function MarketsStep({ profile, setProfile, edit, onBack, onNext }: {
+  profile: Profile; setProfile: React.Dispatch<React.SetStateAction<Profile>>; edit?: EditMode; onBack: () => void; onNext: () => void;
 }) {
   const toggle = (c: string) => setProfile((p) => ({
     ...p,
@@ -438,7 +459,7 @@ function MarketsStep({ profile, setProfile, onBack, onNext }: {
   }));
   return (
     <section className="ob">
-      <StepHead n={3} title="Choose your markets" sub="Your briefing will only show stories from the countries you select." />
+      <StepHead n={3} title="Choose your markets" sub="Your briefing will only show stories from the countries you select." editLabel={edit && "Edit markets"} />
       <div className="pick-grid markets">
         {ONBOARD_MARKETS.map((m) => {
           const on = profile.markets.includes(m.country);
@@ -452,18 +473,18 @@ function MarketsStep({ profile, setProfile, onBack, onNext }: {
         })}
       </div>
       <div className="actions">
-        <button className="btn link" onClick={onBack}>Back</button>
+        <button className="btn link" onClick={edit ? edit.onCancel : onBack}>{edit ? "Cancel" : "Back"}</button>
         <span className="row" style={{ gap: 14 }}>
           <span className="small muted">{profile.markets.length} selected</span>
-          <button className="btn" disabled={!profile.markets.length} onClick={onNext}>Continue</button>
+          <button className="btn" disabled={!profile.markets.length} onClick={edit ? edit.onSave : onNext}>{edit ? "Save changes" : "Continue"}</button>
         </span>
       </div>
     </section>
   );
 }
 
-function TopicsStep({ profile, setProfile, onBack, onNext }: {
-  profile: Profile; setProfile: React.Dispatch<React.SetStateAction<Profile>>; onBack: () => void; onNext: () => void;
+function TopicsStep({ profile, setProfile, edit, onBack, onNext }: {
+  profile: Profile; setProfile: React.Dispatch<React.SetStateAction<Profile>>; edit?: EditMode; onBack: () => void; onNext: () => void;
 }) {
   const toggle = (t: string) => setProfile((p) => ({
     ...p,
@@ -471,7 +492,7 @@ function TopicsStep({ profile, setProfile, onBack, onNext }: {
   }));
   return (
     <section className="ob">
-      <StepHead n={4} title="Choose topics" sub="Optional. Selected topics appear first in your briefing." />
+      <StepHead n={4} title="Choose topics" sub="Optional. Selected topics appear first in your briefing." editLabel={edit && "Edit topics"} />
       <div className="pick-grid topics">
         {TOPICS.map((t) => {
           const on = profile.topics.includes(t);
@@ -483,10 +504,12 @@ function TopicsStep({ profile, setProfile, onBack, onNext }: {
           );
         })}
       </div>
-      <div className="actions">
-        <button className="btn link" onClick={onBack}>Back</button>
-        <button className="btn" onClick={onNext}>Build my briefing</button>
-      </div>
+      {edit ? <EditActions edit={edit} canSave /> : (
+        <div className="actions">
+          <button className="btn link" onClick={onBack}>Back</button>
+          <button className="btn" onClick={onNext}>Build my briefing</button>
+        </div>
+      )}
     </section>
   );
 }
@@ -648,13 +671,13 @@ function IndicatorStrip({ country }: { country: string }) {
   );
 }
 
-function BriefingView({ profile, demo, onEdit, onHome, onLogout, onExitDemo }: {
-  profile: Profile; demo: boolean; onEdit: (s: Step) => void; onHome: () => void; onLogout: () => void; onExitDemo: () => void;
+function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, onExitDemo }: {
+  profile: Profile; demo: boolean; initialView: View; onEdit: (s: Step) => void; onHome: () => void; onLogout: () => void; onExitDemo: () => void;
 }) {
   const legs = useMemo(() => legsFor(profile.markets), [profile.markets]);
   // No topics chosen means no restriction: offer every topic as a filter.
   const topicList = profile.topics.length ? profile.topics : TOPICS;
-  const [view, setView] = useState<View>("all");
+  const [view, setView] = useState<View>(initialView);
   const [filter, setFilter] = useState("top");
   const [feeds, setFeeds] = useState<Record<string, Feed>>({});
   // Loading is tracked per market AND per filter, so one slow request never blocks another.
@@ -768,7 +791,8 @@ function BriefingView({ profile, demo, onEdit, onHome, onLogout, onExitDemo }: {
     const l = legs.find((x) => x.id === v);
     if (l) openMarket(l);
   };
-  useEffect(() => { loadAll(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  // All markets searches only when that view is on screen (not, e.g., when returning to Settings).
+  useEffect(() => { if (view === "all") loadAll(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [view]);
 
   const isNew = (url: string) => seenBefore.current.size > 0 && !seenBefore.current.has(url);
   const isSaved = (url: string) => saved.some((s) => s.url === url);
