@@ -1,7 +1,10 @@
 // Curated list of trusted local outlets per market. The live search is restricted
 // to these domains, so every story in a briefing traces back to one of them.
 
-export type Outlet = { name: string; domain: string; note: string };
+export type Outlet = { name: string; domain: string; also?: string[]; note: string };
+
+// Every domain an outlet publishes on (the search filter and the trust check both use this).
+export const domainsOf = (o: Outlet) => [o.domain, ...(o.also ?? [])];
 
 export type Market = {
   country: string;
@@ -20,24 +23,23 @@ export const MARKETS: Market[] = [
     language: "German",
     cities: ["Munich", "Berlin", "Frankfurt", "Stuttgart", "Hamburg"],
     outlets: [
+      { name: "Tagesschau (ARD)", domain: "tagesschau.de", note: "Public broadcaster" },
+      { name: "Frankfurter Allgemeine", domain: "faz.net", note: "Newspaper of record" },
       { name: "Handelsblatt", domain: "handelsblatt.com", note: "Leading business daily" },
-      { name: "Frankfurter Allgemeine", domain: "faz.net", note: "National daily of record" },
-      { name: "Süddeutsche Zeitung", domain: "sueddeutsche.de", note: "Munich-based national daily" },
-      { name: "Automobilwoche", domain: "automobilwoche.de", note: "Automotive trade weekly" },
     ],
   },
   {
     country: "Japan",
+    // NHK, Nikkei, Asahi and Yomiuri return no Japanese-language articles through the search API
+    // (only NHK World in English), so Japan uses the most authoritative outlets that are actually reachable.
     code: "JP",
     hub: "Tokyo",
     language: "Japanese",
     cities: ["Tokyo", "Osaka", "Nagoya", "Yokohama"],
     outlets: [
-      { name: "Nikkei", domain: "nikkei.com", note: "Leading business daily" },
-      { name: "NHK", domain: "nhk.or.jp", note: "Public broadcaster" },
-      { name: "Asahi Shimbun", domain: "asahi.com", note: "National daily" },
+      { name: "Jiji Press", domain: "jiji.com", note: "National news agency" },
+      { name: "Toyo Keizai", domain: "toyokeizai.net", note: "Leading business weekly" },
       { name: "Nikkan Kogyo Shimbun", domain: "nikkan.co.jp", note: "Industry and manufacturing daily" },
-      { name: "Toyo Keizai", domain: "toyokeizai.net", note: "Business weekly" },
     ],
   },
   {
@@ -47,9 +49,9 @@ export const MARKETS: Market[] = [
     language: "Portuguese",
     cities: ["São Paulo", "Rio de Janeiro", "Brasília"],
     outlets: [
-      { name: "Valor Econômico", domain: "valor.globo.com", note: "Leading business daily" },
       { name: "Folha de S.Paulo", domain: "folha.uol.com.br", note: "National daily" },
       { name: "O Estado de S. Paulo", domain: "estadao.com.br", note: "National daily" },
+      { name: "Valor Econômico", domain: "valor.globo.com", note: "Leading business daily" },
     ],
   },
   {
@@ -59,9 +61,9 @@ export const MARKETS: Market[] = [
     language: "French",
     cities: ["Paris", "Lyon"],
     outlets: [
-      { name: "Les Echos", domain: "lesechos.fr", note: "Leading business daily" },
-      { name: "Le Monde", domain: "lemonde.fr", note: "National daily of record" },
+      { name: "Le Monde", domain: "lemonde.fr", note: "Newspaper of record" },
       { name: "Le Figaro", domain: "lefigaro.fr", note: "National daily" },
+      { name: "Les Echos", domain: "lesechos.fr", note: "Leading business daily" },
     ],
   },
   {
@@ -95,8 +97,9 @@ export const MARKETS: Market[] = [
     language: "Chinese",
     cities: ["Shanghai", "Beijing", "Shenzhen"],
     outlets: [
-      { name: "Caixin", domain: "caixin.com", note: "Independent business weekly" },
-      { name: "Yicai", domain: "yicai.com", note: "Business daily" },
+      { name: "Xinhua", domain: "news.cn", also: ["xinhuanet.com"], note: "State news agency" },
+      { name: "People's Daily", domain: "people.com.cn", note: "Official national daily" },
+      { name: "CCTV", domain: "cctv.com", note: "State broadcaster" },
     ],
   },
   {
@@ -106,9 +109,9 @@ export const MARKETS: Market[] = [
     language: "English",
     cities: ["New York", "San Francisco", "Chicago", "Washington"],
     outlets: [
+      { name: "AP News", domain: "apnews.com", note: "National news agency" },
+      { name: "The New York Times", domain: "nytimes.com", note: "Newspaper of record" },
       { name: "The Wall Street Journal", domain: "wsj.com", note: "Leading business daily" },
-      { name: "The New York Times", domain: "nytimes.com", note: "National daily of record" },
-      { name: "The Washington Post", domain: "washingtonpost.com", note: "National daily" },
     ],
   },
   {
@@ -118,9 +121,9 @@ export const MARKETS: Market[] = [
     language: "English",
     cities: ["London", "Manchester", "Edinburgh"],
     outlets: [
+      { name: "BBC News", domain: "bbc.co.uk", also: ["bbc.com"], note: "Public broadcaster" },
+      { name: "The Times", domain: "thetimes.com", also: ["thetimes.co.uk"], note: "Newspaper of record" },
       { name: "Financial Times", domain: "ft.com", note: "Leading business daily" },
-      { name: "The Guardian", domain: "theguardian.com", note: "National daily" },
-      { name: "BBC News", domain: "bbc.co.uk", note: "Public broadcaster" },
     ],
   },
   {
@@ -130,9 +133,9 @@ export const MARKETS: Market[] = [
     language: "English",
     cities: ["Sydney", "Melbourne"],
     outlets: [
-      { name: "Australian Financial Review", domain: "afr.com", note: "Leading business daily" },
-      { name: "The Sydney Morning Herald", domain: "smh.com.au", note: "Metropolitan daily" },
       { name: "ABC News", domain: "abc.net.au", note: "Public broadcaster" },
+      { name: "The Sydney Morning Herald", domain: "smh.com.au", note: "Metropolitan daily of record" },
+      { name: "Australian Financial Review", domain: "afr.com", note: "Leading business daily" },
     ],
   },
   {
@@ -142,10 +145,9 @@ export const MARKETS: Market[] = [
     language: "English",
     cities: ["Mumbai", "New Delhi", "Bengaluru"],
     outlets: [
+      { name: "The Hindu", domain: "thehindu.com", note: "National daily of record" },
+      { name: "The Indian Express", domain: "indianexpress.com", note: "National daily" },
       { name: "The Economic Times", domain: "economictimes.indiatimes.com", note: "Leading business daily" },
-      { name: "Mint", domain: "livemint.com", note: "Business daily" },
-      { name: "Business Standard", domain: "business-standard.com", note: "Business daily" },
-      { name: "The Hindu", domain: "thehindu.com", note: "National daily" },
     ],
   },
   {
@@ -155,9 +157,9 @@ export const MARKETS: Market[] = [
     language: "English",
     cities: ["Toronto", "Vancouver", "Montreal"],
     outlets: [
-      { name: "The Globe and Mail", domain: "theglobeandmail.com", note: "National daily" },
-      { name: "Financial Post", domain: "financialpost.com", note: "Business daily" },
       { name: "CBC News", domain: "cbc.ca", note: "Public broadcaster" },
+      { name: "The Globe and Mail", domain: "theglobeandmail.com", note: "National daily of record" },
+      { name: "CTV News", domain: "ctvnews.ca", note: "National broadcaster" },
     ],
   },
   {
@@ -167,9 +169,9 @@ export const MARKETS: Market[] = [
     language: "English",
     cities: ["Singapore"],
     outlets: [
+      { name: "CNA", domain: "channelnewsasia.com", note: "Broadcaster, most used online" },
       { name: "The Straits Times", domain: "straitstimes.com", note: "National daily" },
       { name: "The Business Times", domain: "businesstimes.com.sg", note: "Business daily" },
-      { name: "CNA", domain: "channelnewsasia.com", note: "Broadcaster" },
     ],
   },
   {
@@ -179,9 +181,9 @@ export const MARKETS: Market[] = [
     language: "English",
     cities: ["Dubai", "Abu Dhabi"],
     outlets: [
+      { name: "WAM", domain: "wam.ae", note: "Official news agency" },
       { name: "The National", domain: "thenationalnews.com", note: "Abu Dhabi-based daily" },
       { name: "Gulf News", domain: "gulfnews.com", note: "Dubai-based daily" },
-      { name: "Khaleej Times", domain: "khaleejtimes.com", note: "Dubai-based daily" },
     ],
   },
 ];
@@ -217,5 +219,5 @@ export function outletForUrl(url: string, market: Market): Outlet | undefined {
   } catch {
     return undefined;
   }
-  return market.outlets.find((o) => host === o.domain || host.endsWith("." + o.domain));
+  return market.outlets.find((o) => domainsOf(o).some((d) => host === d || host.endsWith("." + d)));
 }

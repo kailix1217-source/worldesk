@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isEnglishEdition, marketFor, outletForUrl } from "@/lib/sources";
+import { domainsOf, isEnglishEdition, marketFor, outletForUrl } from "@/lib/sources";
 import { sampleBriefing } from "@/lib/sample";
 import { TOPICS, type Article, type Briefing, type Leg, type Profile } from "@/lib/types";
 
@@ -94,7 +94,7 @@ landing_note: one sentence on the overall business mood in ${leg.arrive ? leg.ci
         {
           type: "web_search",
           filters: {
-            search_domain_filter: market.outlets.map((o) => o.domain),
+            search_domain_filter: market.outlets.flatMap(domainsOf),
             search_recency_filter: recency,
           },
         },

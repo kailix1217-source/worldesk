@@ -456,7 +456,6 @@ function MarketsStep({ profile, setProfile, onBack, onNext }: {
               <span className="pick-code">{m.code}</span>
               <span className="pick-box" aria-hidden="true" />
               <span className="pick-name">{m.country}</span>
-              <span className="pick-sub">{m.outlets[0].name}{m.language !== "English" ? ` · in ${m.language}` : ""}</span>
             </button>
           );
         })}
