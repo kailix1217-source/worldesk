@@ -22,6 +22,10 @@ const SCHEMA = {
           why_it_matters: { type: "string" },
           url: { type: "string" },
           category: { type: "string", enum: TOPICS },
+          also_reported_by: {
+            type: "array",
+            items: { type: "object", properties: { outlet: { type: "string" }, url: { type: "string" } }, required: ["outlet", "url"] },
+          },
         },
         required: ["outlet", "original_headline", "english_headline", "date", "summary", "why_it_matters", "url", "category"],
       },
@@ -75,6 +79,7 @@ Tag each story with exactly one category from: ${TOPICS.join(", ")}.${
     exclude.length ? `\nThe reader has already seen these, do NOT return them again:\n${exclude.slice(0, 40).join("\n")}` : ""
   }
 For each: outlet name, the original ${market.language} headline, an accurate English translation, publication date (YYYY-MM-DD), a 2-sentence English summary that keeps the local framing and tone, and one sentence "why it matters" addressed to this reader (concrete: which conversation or decision it affects${profile.company?.trim() ? `, for ${profile.company.trim()} specifically where possible` : ""}).
+also_reported_by: if another of the listed outlets also reported the same story, give its outlet name and exact article URL from your search results; otherwise an empty list.
 landing_note: one sentence on the overall business mood in ${leg.arrive ? leg.city : leg.country} this week, based only on these stories.`;
 
   // Perplexity Agent API: https://docs.perplexity.ai/api-reference/agent-post
@@ -144,12 +149,43 @@ function clean(
     if (new URL(a.url).pathname.split("/").filter(Boolean).length < 1) continue;
     // A topic request searched for that category, so file its results there
     const category = topic ?? (TOPICS.includes(a.category) ? a.category : "Markets & Economy");
-    out.push({ ...a, category, outlet: outlet.name, verified: found.has(key) });
+    // Extra sources pass the same trust checks as the primary link
+    const sources = [{ outlet: outlet.name, url: a.url }];
+    for (const s of a.also_reported_by ?? []) {
+      const o = outletForUrl(s.url, market);
+      if (!o || sources.some((x) => x.url === s.url || x.outlet === o.name)) continue;
+      if (market.language !== "English" && isEnglishEdition(s.url)) continue;
+      sources.push({ outlet: o.name, url: s.url });
+    }
+    const { also_reported_by: _drop, ...rest } = a;
+    out.push({ ...rest, category, outlet: outlet.name, sources, verified: found.has(key) });
   }
   // Prefer stories the search engine actually returned; keep unverified only as filler
   out.sort((x, y) => Number(y.verified) - Number(x.verified));
   const verified = out.filter((a) => a.verified);
   return verified.length >= 3 ? verified : out;
+}
+
+// The article's own preview image, read from its og:image / twitter:image tag. URLs are already
+// limited to whitelisted outlets; anything slow, blocked or odd just means "no image".
+async function previewImage(url: string): Promise<string | undefined> {
+  try {
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(3000),
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; WorldeskPreview/1.0)", Accept: "text/html" },
+      redirect: "follow",
+    });
+    if (!res.ok || !res.headers.get("content-type")?.includes("html")) return;
+    const head = (await res.text()).slice(0, 200_000);
+    const m =
+      head.match(/<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]*content=["']([^"']+)["']/i) ??
+      head.match(/<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["'](?:og:image|twitter:image)["']/i);
+    if (!m) return;
+    const img = new URL(m[1].replace(/&amp;/g, "&"), url);
+    return img.protocol === "https:" ? img.href : undefined;
+  } catch {
+    return;
+  }
 }
 
 export async function POST(req: Request) {
@@ -170,7 +206,13 @@ export async function POST(req: Request) {
       ({ parsed, results, market } = await search(r, "month"));
       articles = clean(parsed, results, market, r.exclude, r.topic);
     }
-    const briefing: Briefing = { landing_note: parsed.landing_note, articles: articles.slice(0, r.count), source: "live" };
+    const top = articles.slice(0, r.count);
+    const images = await Promise.all(top.map((a) => previewImage(a.url)));
+    const briefing: Briefing = {
+      landing_note: parsed.landing_note,
+      articles: top.map((a, i) => (images[i] ? { ...a, image: images[i] } : a)),
+      source: "live",
+    };
     return NextResponse.json(briefing);
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 502 });

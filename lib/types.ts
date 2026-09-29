@@ -30,6 +30,10 @@ export type Article = {
   category: string; // one of TOPICS, assigned by the model
   verified: boolean; // url appeared in the search engine's own results
   origin?: string; // client-side: which filter request loaded it ("top" or a topic)
+  sources?: { outlet: string; url: string }[]; // every whitelisted outlet that ran the story, primary first
+  image?: string; // the article's own preview image (og:image), when the outlet publishes one
+  country?: string; // client-side: the market the story was loaded for
+  also_reported_by?: { outlet: string; url: string }[]; // raw model output, verified into `sources`
 };
 
 export type Briefing = {

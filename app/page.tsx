@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ONBOARD_MARKETS, marketFor } from "@/lib/sources";
-import { DOTS, PINS, WORLD } from "@/lib/worldDots";
+import { DOTS, PIN_OF, PINS, WORLD } from "@/lib/worldDots";
 import {
   FUNCTIONS, INDUSTRIES, TOPICS,
   type Article, type Briefing, type Leg, type Profile,
@@ -85,6 +85,13 @@ export default function Home() {
     );
   }
 
+  if (step === "briefing") {
+    return (
+      <BriefingView key={demo ? "demo" : profile.markets.join(",")} profile={demo ? DEMO_PROFILE : profile} demo={demo}
+        onEdit={setStep} onHome={() => setStep("welcome")} onLogout={logOut} onExitDemo={exitDemo} />
+    );
+  }
+
   const stepNo = ONBOARDING.indexOf(step);
   return (
     <main className="wrap">
@@ -94,19 +101,6 @@ export default function Home() {
         </button>
         <div className="mast-meta">
           {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-          {step === "briefing" && (
-            <div className="row" style={{ justifyContent: "flex-end", gap: 10 }}>
-              {demo ? (
-                <button onClick={exitDemo}>Exit sample</button>
-              ) : (
-                <>
-                  <button onClick={() => setStep("about")}>Profile</button>
-                  <button onClick={() => setStep("markets")}>Markets</button>
-                  <button onClick={logOut}>Log out</button>
-                </>
-              )}
-            </div>
-          )}
         </div>
       </header>
 
@@ -129,9 +123,6 @@ export default function Home() {
       {step === "topics" && (
         <TopicsStep profile={profile} setProfile={setProfile} onBack={() => setStep("markets")} onNext={() => setStep("briefing")} />
       )}
-      {step === "briefing" && (demo
-        ? <BriefingView key="demo" profile={DEMO_PROFILE} />
-        : <BriefingView key={profile.markets.join(",")} profile={profile} />)}
     </main>
   );
 }
@@ -502,25 +493,96 @@ function TopicsStep({ profile, setProfile, onBack, onNext }: {
 
 type Feed = { note: string; articles: Article[]; source?: "live" | "sample"; fetched: string[]; updatedAt: string };
 type Alerts = { push: boolean; time: string; breaking: boolean };
+type View = "all" | "saved" | "settings" | string; // any other string is a market's country
 const ALERT_DEFAULT: Alerts = { push: false, time: "07:00", breaking: true };
 const TIMEOUT_MS = 110_000;
-
 const STORY_COUNT = 6;
+const POOL = 3; // All markets never runs more than 3 searches at once
 
-function BriefingView({ profile }: { profile: Profile }) {
+function relDate(d: string) {
+  const day = d?.slice(0, 10);
+  const diff = Math.round((Date.parse(iso(new Date())) - Date.parse(day)) / 86400000);
+  if (!day || Number.isNaN(diff)) return "";
+  if (diff <= 0) return "Today";
+  if (diff === 1) return "Yesterday";
+  return diff < 7 ? `${diff} days ago` : fmt(day);
+}
+const sourcesOf = (a: Article) => (a.sources?.length ? a.sources : [{ outlet: a.outlet, url: a.url }]);
+
+// Fallback thumbnail when an outlet publishes no preview image: the dotted map around that market.
+function MapThumb({ country }: { country: string }) {
+  const [x, y] = PIN_OF[country] ?? [77, 18];
+  const w = useMemo(() => mapWindow(x, y), [x, y]);
+  return (
+    <svg className="sc-map" viewBox={w.viewBox} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <path d={w.dots} className="bb-dark-dot" />
+      <circle cx={x} cy={y} r={PIN_R * 2.4} className="bb-halo" />
+      <circle cx={x} cy={y} r={PIN_R * 1.1} className="bb-pin" />
+    </svg>
+  );
+}
+
+function StoryCard({ a, isNew, saved, onSave, onTag }: {
+  a: Article; isNew: boolean; saved: boolean; onSave: () => void; onTag: (t: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [imgOk, setImgOk] = useState(true);
+  const country = a.country ?? "";
+  const srcs = sourcesOf(a);
+  const lang = marketFor(country)?.language;
+  return (
+    <article className="sc" data-url={a.url}>
+      <div className="sc-media">
+        {a.image && imgOk
+          ? <img src={a.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setImgOk(false)} />
+          : <MapThumb country={country} />}
+      </div>
+      <div className="sc-body">
+        <div className="sc-meta">
+          <button className="tag" onClick={() => onTag(a.category)}>{a.category}</button>
+          {isNew && <span className="new">New</span>}
+          <b>{a.outlet}</b>
+          {country && <><i aria-hidden="true">·</i><span>{country}</span></>}
+          {a.date && <><i aria-hidden="true">·</i><span>{relDate(a.date)}</span></>}
+        </div>
+        <button className={`sc-save ${saved ? "on" : ""}`} onClick={onSave} aria-pressed={saved}
+          aria-label={saved ? "Remove from saved stories" : "Save story"} title={saved ? "Saved" : "Save"}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z" /></svg>
+        </button>
+        <h3>{a.english_headline}</h3>
+        <div className="why"><b>Why it matters to you</b>{a.why_it_matters}</div>
+        {open && <p className="sc-sum">{a.summary}</p>}
+      </div>
+      <footer className="sc-foot">
+        <span className="sc-count">{srcs.length} {srcs.length === 1 ? "source" : "sources"}{lang && lang !== "English" ? ` · in ${lang}` : ""}</span>
+        {srcs.map((s) => (
+          <a key={s.url} className="sc-link" href={s.url} target="_blank" rel="noopener noreferrer">View {s.outlet} ↗</a>
+        ))}
+        <button className={`sc-toggle ${open ? "open" : ""}`} onClick={() => setOpen((v) => !v)} aria-expanded={open}
+          aria-label={open ? "Hide summary" : "Show summary"} title={open ? "Less" : "Read summary"}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+        </button>
+      </footer>
+    </article>
+  );
+}
+
+function BriefingView({ profile, demo, onEdit, onHome, onLogout, onExitDemo }: {
+  profile: Profile; demo: boolean; onEdit: (s: Step) => void; onHome: () => void; onLogout: () => void; onExitDemo: () => void;
+}) {
   const legs = useMemo(() => legsFor(profile.markets), [profile.markets]);
   // No topics chosen means no restriction: offer every topic as a filter.
   const topicList = profile.topics.length ? profile.topics : TOPICS;
-  const [sel, setSel] = useState(legs[0]?.id);
+  const [view, setView] = useState<View>("all");
   const [filter, setFilter] = useState("top");
   const [feeds, setFeeds] = useState<Record<string, Feed>>({});
-  // Loading is tracked per city AND per filter, so one slow request never blocks another.
+  // Loading is tracked per market AND per filter, so one slow request never blocks another.
   const [busy, setBusy] = useState<Record<string, number>>({}); // "legId|filter" -> startedAt
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
   const [notice, setNotice] = useState<Record<string, string | undefined>>({});
   const [alerts, setAlerts] = useState<Alerts>(() => ({ ...ALERT_DEFAULT, ...load<Partial<Alerts>>("wd.alerts", {}) }));
-  const [showSettings, setShowSettings] = useState(false);
   const [alertMsg, setAlertMsg] = useState("");
+  const [saved, setSaved] = useState<Article[]>(() => load<Article[]>("wd.saved", []));
   const feedsRef = useRef(feeds);
   feedsRef.current = feeds;
   const inflight = useRef<Set<string>>(new Set()); // synchronous guard against duplicate requests
@@ -536,10 +598,10 @@ function BriefingView({ profile }: { profile: Profile }) {
   }, [feeds]);
 
   const cacheKey = (leg: Leg) =>
-    `wd.feed.${leg.country}.${profile.industry}.${profile.func}.${profile.company}.${profile.topics.join(",")}.${iso(new Date())}`;
+    `wd.feed3.${leg.country}.${profile.industry}.${profile.func}.${profile.company}.${profile.topics.join(",")}.${iso(new Date())}`;
   const bkey = (leg: Leg, f: string) => `${leg.id}|${f}`;
 
-  const fetchMore = async (leg: Leg, f: string, reset = false) => {
+  const fetchMore = async (leg: Leg, f: string, reset = false, preloadTopics = false) => {
     const k = bkey(leg, f);
     if (inflight.current.has(k)) return;
     inflight.current.add(k);
@@ -569,7 +631,7 @@ function BriefingView({ profile }: { profile: Profile }) {
       setFeeds((all) => {
         const prev = reset ? undefined : all[leg.id];
         const urls = new Set(prev?.articles.map((a) => a.url));
-        const added = json.articles.filter((a) => !urls.has(a.url)).map((a) => ({ ...a, origin: f }));
+        const added = json.articles.filter((a) => !urls.has(a.url)).map((a) => ({ ...a, origin: f, country: leg.country }));
         const next: Feed = {
           note: prev?.note || json.landing_note,
           articles: [...(prev?.articles ?? []), ...added],
@@ -580,8 +642,7 @@ function BriefingView({ profile }: { profile: Profile }) {
         if (json.source === "live") save(cacheKey(leg), next);
         return { ...all, [leg.id]: next };
       });
-      // Preload the reader's own topics for the market that's open, so topic taps are instant.
-      if (f === "top" && !reset) {
+      if (f === "top" && preloadTopics) {
         // wait a tick so feedsRef includes the top stories and they're excluded from topic results
         setTimeout(() => profile.topics.forEach((t) => fetchMore(leg, t)), 50);
       }
@@ -595,55 +656,63 @@ function BriefingView({ profile }: { profile: Profile }) {
     }
   };
 
-  // Markets load when their tab is opened (cached for the day), so picking 12 markets doesn't start 12 searches.
-  const open = (l: Leg) => {
-    if (feedsRef.current[l.id]) return;
+  // Use today's cached feed for a market if there is one; true when nothing needs fetching.
+  const fromCache = (l: Leg) => {
+    if (feedsRef.current[l.id]) return true;
     const cached = load<Feed | null>(cacheKey(l), null);
-    if (cached) {
-      setFeeds((all) => ({ ...all, [l.id]: cached }));
-      profile.topics.filter((t) => !cached.fetched.includes(t)).forEach((t) => fetchMore(l, t));
-    } else fetchMore(l, "top");
+    if (!cached) return false;
+    feedsRef.current = { ...feedsRef.current, [l.id]: cached };
+    setFeeds((all) => ({ ...all, [l.id]: cached }));
+    return true;
   };
-  useEffect(() => {
-    if (legs[0]) open(legs[0]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // A market view also preloads the reader's topics, so topic taps there are instant.
+  const openMarket = (l: Leg) => {
+    if (fromCache(l)) {
+      const f = feedsRef.current[l.id];
+      profile.topics.filter((t) => !f?.fetched.includes(t)).forEach((t) => fetchMore(l, t));
+    } else fetchMore(l, "top", false, true);
+  };
+  // All markets loads every market's top stories, at most POOL searches at a time.
+  const loadAll = async () => {
+    const todo = legs.filter((l) => !fromCache(l));
+    let i = 0;
+    const worker = async () => { while (i < todo.length) await fetchMore(todo[i++], "top"); };
+    await Promise.all(Array.from({ length: Math.min(POOL, todo.length) }, worker));
+  };
 
-  const leg = legs.find((l) => l.id === sel) ?? legs[0];
-  if (!leg) return <p className="muted" style={{ paddingTop: 32 }}>Choose at least one market to build your briefing.</p>;
-  const market = marketFor(leg.country);
-  const feed = feeds[leg.id];
-  const k = bkey(leg, filter);
-  const startedAt = busy[k];
-  const error = errors[k];
-  const hour = new Date().getHours();
+  const go = (v: View) => {
+    setView(v);
+    setFilter("top");
+    window.scrollTo(0, 0);
+    const l = legs.find((x) => x.id === v);
+    if (l) openMarket(l);
+  };
+  useEffect(() => { loadAll(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
-  const visible = (feed?.articles ?? []).filter((a) => (filter === "top" ? a.origin === "top" : a.category === filter));
-  const countFor = (t: string) => (feed?.articles ?? []).filter((a) => a.category === t).length;
   const isNew = (url: string) => seenBefore.current.size > 0 && !seenBefore.current.has(url);
-  const newCount = (feed?.articles ?? []).filter((a) => isNew(a.url)).length;
-
-  const pick = (f: string) => {
-    setFilter(f);
-    if (f !== "top" && !(feed?.fetched.includes(f)) && !busy[bkey(leg, f)]) fetchMore(leg, f);
+  const isSaved = (url: string) => saved.some((s) => s.url === url);
+  const toggleSave = (a: Article) => {
+    const next = isSaved(a.url) ? saved.filter((s) => s.url !== a.url) : [{ ...a }, ...saved];
+    setSaved(next);
+    save("wd.saved", next);
   };
 
   const saveAlerts = (next: Alerts) => { setAlerts(next); save("wd.alerts", next); };
-
-  // Push notification: readable on its own; tapping it opens this city and scrolls to the story.
-  const notify = (l: Leg, a: Article | undefined) => {
-    const n = new Notification(`${l.country} · today's briefing`, {
-      body: a ? `${a.outlet}: ${a.english_headline}\n${a.why_it_matters}`.slice(0, 220) : `Your ${l.country} briefing is ready.`,
-      tag: `worldesk-${l.id}`,
+  const firstStory = legs.map((l) => feeds[l.id]?.articles[0]).find(Boolean);
+  // Push notification: readable on its own; tapping it opens the market and scrolls to the story.
+  const notify = (a: Article | undefined) => {
+    const country = a?.country ?? legs[0]?.country ?? "Worldesk";
+    const n = new Notification(`${country} · today's briefing`, {
+      body: a ? `${a.outlet}: ${a.english_headline}\n${a.why_it_matters}`.slice(0, 220) : `Your ${country} briefing is ready.`,
+      tag: `worldesk-${country}`,
     });
     n.onclick = () => {
       window.focus();
-      setSel(l.id);
-      setFilter("top");
+      go(country);
       setTimeout(() => {
         const el = a && document.querySelector(`[data-url="${CSS.escape(a.url)}"]`);
-        (el ?? document.querySelector(".city-head"))?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 100);
+        el?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 150);
       n.close();
     };
   };
@@ -656,46 +725,97 @@ function BriefingView({ profile }: { profile: Profile }) {
   const turnOn = async () => {
     if (!(await permission())) return;
     saveAlerts({ ...alerts, push: true });
-    notify(leg, visible[0] ?? feed?.articles[0]);
+    notify(firstStory);
     setAlertMsg("Alerts on. We just sent you a sample.");
   };
   const testAlert = async () => {
     if (!(await permission())) return;
-    notify(leg, visible[0] ?? feed?.articles[0]);
+    notify(firstStory);
     setAlertMsg("Test alert sent.");
   };
 
-  return (
-    <section>
-      <div className="greet">
-        <div className="kicker">Your briefing</div>
-        <h1>Good {hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening"}, {profile.name.split(" ")[0] || "there"}.</h1>
-        <p className="muted small" style={{ margin: "4px 0 0" }}>
-          Tuned for {profile.func.toLowerCase()} in {profile.industry.toLowerCase()}
-          {profile.topics.length ? `, following ${profile.topics.join(", ").toLowerCase()}` : ""}.
-        </p>
-      </div>
+  const hour = new Date().getHours();
+  const greeting = `Good ${hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening"}, ${profile.name.split(" ")[0] || "there"}`;
+  const leg = legs.find((l) => l.id === view);
+  const market = leg ? marketFor(leg.country) : undefined;
+  const loadingMarkets = legs.filter((l) => busy[bkey(l, "top")]);
 
-      <nav className="timeline markets-nav" aria-label="Your markets">
-        {legs.map((l) => {
-          const m = marketFor(l.country);
-          const n = feeds[l.id]?.articles.length ?? 0;
-          return (
-            <button key={l.id} className={`stop next ${l.id === leg.id ? "sel" : ""}`} aria-current={l.id === leg.id}
-              onClick={() => { setSel(l.id); setFilter("top"); open(l); }}>
-              <span className="stage next">{m?.code}</span>
-              <span className="city">{l.country}</span>
-              <span className="depth">{n ? `${n} stories` : l.id === leg.id ? "Loading…" : "Tap to load"}</span>
-            </button>
-          );
-        })}
-      </nav>
+  const renderCards = (list: Article[]) => list.map((a) => (
+    <StoryCard key={a.url} a={a} isNew={isNew(a.url)} saved={isSaved(a.url)} onSave={() => toggleSave(a)}
+      onTag={(t) => { if (topicList.includes(t)) setFilter(t); }} />
+  ));
+  const Chips = ({ onPick, counts }: { onPick: (t: string) => void; counts: (t: string) => number }) => (
+    <div className="filters" role="tablist" aria-label="Filter stories">
+      <button role="tab" aria-selected={filter === "top"} className={`chip ${filter === "top" ? "on" : ""}`} onClick={() => onPick("top")}>Top stories</button>
+      {topicList.map((t) => {
+        const loadingT = !!(leg && busy[bkey(leg, t)]);
+        return (
+          <button key={t} role="tab" aria-selected={filter === t} className={`chip ${filter === t ? "on" : ""}`} onClick={() => onPick(t)}>
+            {t}{loadingT ? <span className="spin" aria-label="loading" /> : counts(t) > 0 && <span className="count">{counts(t)}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
 
-      <div className="city-head">
-        <div className="kicker">Business news · {leg.city}</div>
-        <h2>{leg.country}</h2>
-        {market && (
-          <div className="city-sub">
+  let body: React.ReactNode;
+  if (view === "all") {
+    const merged = legs
+      .flatMap((l) => (feeds[l.id]?.articles ?? []).filter((a) => a.origin === "top").map((a) => ({ ...a, country: l.country })))
+      .sort((x, y) => (y.date || "").localeCompare(x.date || ""));
+    const visible = filter === "top" ? merged : merged.filter((a) => a.category === filter);
+    const firstLoading = loadingMarkets[0];
+    body = (
+      <>
+        <header className="bf-head">
+          <div className="kicker">{greeting}</div>
+          <h1>All markets</h1>
+          <p>{legs.length} selected {legs.length === 1 ? "market" : "markets"} · Latest developments
+            {loadingMarkets.length > 0 && <> · <span className="spin" aria-hidden="true" /> Loading {loadingMarkets.map((l) => l.country).join(", ")}</>}
+          </p>
+        </header>
+        <section className="summary">
+          <div className="summary-label">This week across your markets</div>
+          <ul className="summary-rows">
+            {legs.map((l) => {
+              const f = feeds[l.id];
+              const err = errors[bkey(l, "top")];
+              return (
+                <li key={l.id}>
+                  <button onClick={() => go(l.id)}>{marketFor(l.country)?.code}</button>
+                  <span>{f?.note || (err ? `Couldn't load ${l.country} (${err}).` : busy[bkey(l, "top")] ? `Reading ${l.country}'s local press…` : "Waiting to load…")}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+        <Chips onPick={setFilter} counts={(t) => merged.filter((a) => a.category === t).length} />
+        {merged.length === 0 && firstLoading && (
+          <Progress startedAt={busy[bkey(firstLoading, "top")]} leg={firstLoading} profile={profile} />
+        )}
+        {merged.length > 0 && visible.length === 0 && <p className="muted bf-empty">No {filter} stories in your markets yet. Open a market to search for more.</p>}
+        {renderCards(visible)}
+        {merged.length > 0 && <p className="small muted bf-more">Open a market on the left for topic deep-dives and more stories.</p>}
+      </>
+    );
+  } else if (leg && market) {
+    const feed = feeds[leg.id];
+    const k = bkey(leg, filter);
+    const startedAt = busy[k];
+    const error = errors[k];
+    const mine = (feed?.articles ?? []).map((a) => ({ ...a, country: leg.country }));
+    const visible = mine.filter((a) => (filter === "top" ? a.origin === "top" : a.category === filter));
+    const newCount = mine.filter((a) => isNew(a.url)).length;
+    const pick = (f: string) => {
+      setFilter(f);
+      if (f !== "top" && !(feed?.fetched.includes(f)) && !busy[bkey(leg, f)]) fetchMore(leg, f);
+    };
+    body = (
+      <>
+        <header className="bf-head">
+          <div className="kicker">Business news · {leg.city}</div>
+          <h1>{leg.country}</h1>
+          <p>
             Read in {market.language} from {market.outlets.map((o) => o.name).join(", ")}
             {feed?.updatedAt && <> · Updated {new Date(feed.updatedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</>}
             {newCount > 0 && lastVisit.current && (
@@ -704,35 +824,90 @@ function BriefingView({ profile }: { profile: Profile }) {
             {" · "}
             <button className="btn link small" style={{ padding: 0, fontSize: 13 }} disabled={!!busy[bkey(leg, "top")]}
               onClick={() => { setFilter("top"); fetchMore(leg, "top", true); }}>Refresh</button>
+          </p>
+        </header>
+        {feed?.source === "sample" && (
+          <div className="banner">Sample mode: no API key is configured, so these are placeholders. Live mode pulls real articles.</div>
+        )}
+        {feed?.note && (
+          <section className="summary">
+            <div className="summary-label">This week in {leg.country}</div>
+            <p>{feed.note}</p>
+          </section>
+        )}
+        <Chips onPick={pick} counts={(t) => mine.filter((a) => a.category === t).length} />
+        {visible.length === 0 && startedAt && (
+          <Progress startedAt={startedAt} leg={leg} profile={profile} topic={filter === "top" ? undefined : filter} />
+        )}
+        {error && (
+          <div className="error">
+            Couldn&apos;t load stories ({error}).{" "}
+            <button className="btn link" onClick={() => fetchMore(leg, filter)}>Try again</button>
           </div>
         )}
-      </div>
-
-      {(
-        <div className="alert-card">
+        {visible.length === 0 && !startedAt && !error && feed && (
+          <p className="muted bf-empty">No {filter === "top" ? "" : filter + " "}stories from our {leg.country} outlets yet. Try &quot;Load more&quot;.</p>
+        )}
+        {renderCards(visible)}
+        {notice[k] && <p className="small muted" style={{ textAlign: "center", marginTop: 16 }}>{notice[k]}</p>}
+        {feed && visible.length > 0 && (
+          <div className="more">
+            {startedAt ? (
+              <Progress startedAt={startedAt} leg={leg} profile={profile} topic={filter === "top" ? undefined : filter} compact />
+            ) : (
+              <button className="btn ghost" onClick={() => fetchMore(leg, filter)}>Load 5 more {filter === "top" ? "stories" : filter}</button>
+            )}
+          </div>
+        )}
+      </>
+    );
+  } else if (view === "saved") {
+    body = (
+      <>
+        <header className="bf-head">
+          <div className="kicker">Your library</div>
+          <h1>Saved stories</h1>
+          <p>{saved.length ? `${saved.length} saved ${saved.length === 1 ? "story" : "stories"}, newest first. Kept in this browser.` : "Tap the bookmark on any story to keep it here."}</p>
+        </header>
+        {renderCards(saved)}
+      </>
+    );
+  } else {
+    const rows: [string, string][] = [
+      ["Name", profile.name], ["Email", profile.email || "—"], ["Job title", profile.title],
+      ["Company", profile.company || "—"], ["Industry", profile.industry], ["Function", profile.func],
+      ["Markets", profile.markets.join(", ")], ["Topics", profile.topics.join(", ") || "All topics"],
+    ];
+    body = (
+      <>
+        <header className="bf-head">
+          <div className="kicker">Your account</div>
+          <h1>Settings</h1>
+          <p>What your briefing is tuned to, and how it reaches you.</p>
+        </header>
+        <section className="set-card">
+          <h2>Profile</h2>
+          <dl className="set-rows">{rows.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+          {demo ? <p className="small muted">This is the sample executive, so editing is off.</p> : (
+            <div className="row">
+              <button className="btn ghost small-btn" onClick={() => onEdit("about")}>Edit profile</button>
+              <button className="btn ghost small-btn" onClick={() => onEdit("markets")}>Edit markets</button>
+              <button className="btn ghost small-btn" onClick={() => onEdit("topics")}>Edit topics</button>
+            </div>
+          )}
+        </section>
+        <section className="set-card">
+          <h2>Push alerts</h2>
           {!alerts.push ? (
             <div className="alert-row">
-              <div>
-                <b>Get this briefing on your phone</b>
-                <div className="small muted">A morning push with the top {leg.country} story, plus breaking news on your topics.</div>
-              </div>
+              <div className="small muted">A morning push with your top story, plus breaking news on your topics.</div>
               <button className="btn small-btn" onClick={turnOn}>Turn on alerts</button>
             </div>
           ) : (
-            <div className="alert-row">
-              <div className="small">
-                <b>Alerts on</b> · Daily at {alerts.time}{alerts.breaking ? " · breaking news on your topics" : ""}
-              </div>
-              <button className="btn link small" style={{ padding: 0 }} onClick={() => setShowSettings((v) => !v)}>
-                {showSettings ? "Done" : "Settings"}
-              </button>
-            </div>
-          )}
-          {alerts.push && showSettings && (
-            <div className="alerts">
-              <div className="field" style={{ maxWidth: 200 }}>
-                <label>Daily briefing time</label>
-                <select value={alerts.time} onChange={(e) => saveAlerts({ ...alerts, time: e.target.value })}>
+            <>
+              <div className="field" style={{ maxWidth: 220 }}>
+                <label htmlFor="al-time">Daily briefing time</label>
+                <select id="al-time" value={alerts.time} onChange={(e) => saveAlerts({ ...alerts, time: e.target.value })}>
                   {["06:00", "06:30", "07:00", "07:30", "08:00", "12:00", "18:00"].map((t) => <option key={t}>{t}</option>)}
                 </select>
               </div>
@@ -742,88 +917,63 @@ function BriefingView({ profile }: { profile: Profile }) {
               </label>
               <div className="row" style={{ marginTop: 12 }}>
                 <button className="btn ghost small-btn" onClick={testAlert}>Send test alert</button>
-                <button className="btn link small" onClick={() => { saveAlerts({ ...alerts, push: false }); setShowSettings(false); setAlertMsg(""); }}>Turn off</button>
+                <button className="btn link small" onClick={() => { saveAlerts({ ...alerts, push: false }); setAlertMsg(""); }}>Turn off</button>
               </div>
-              <p className="small muted" style={{ marginBottom: 0 }}>
-                Prototype: scheduled daily and breaking pushes aren&apos;t connected yet. Test alerts are real notifications; tap one to jump to the story.
-              </p>
-            </div>
+            </>
           )}
           {alertMsg && <p className="small muted" style={{ margin: "8px 0 0" }}>{alertMsg}</p>}
+          <p className="small muted" style={{ marginBottom: 0 }}>
+            Prototype: scheduled daily and breaking pushes aren&apos;t connected yet. Test alerts are real notifications; tap one to jump to the story.
+          </p>
+        </section>
+      </>
+    );
+  }
+
+  return (
+    <div className="bf">
+      <aside className="sb">
+        <button className="wordmark sb-brand" onClick={onHome}>Worl<span>desk</span></button>
+        <nav className="sb-nav" aria-label="Briefing">
+          <div className="sb-label">Briefing</div>
+          <button className={`sb-item ${view === "all" ? "on" : ""}`} aria-current={view === "all"} onClick={() => go("all")}>
+            <span className="sb-dot" aria-hidden="true" />All markets
+          </button>
+          <div className="sb-label">Selected markets</div>
+          {legs.map((l) => {
+            const n = feeds[l.id]?.articles.length ?? 0;
+            return (
+              <button key={l.id} className={`sb-item ${view === l.id ? "on" : ""}`} aria-current={view === l.id} onClick={() => go(l.id)}>
+                <span className="sb-code">{marketFor(l.country)?.code}</span>
+                <span className="sb-name">{l.country}</span>
+                {busy[bkey(l, "top")] ? <span className="spin" aria-label="loading" /> : n > 0 && <span className="sb-n">{n}</span>}
+              </button>
+            );
+          })}
+        </nav>
+        <div className="sb-foot">
+          <button className={`sb-item ${view === "saved" ? "on" : ""}`} onClick={() => go("saved")}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z" /></svg>Saved stories
+            {saved.length > 0 && <span className="sb-n">{saved.length}</span>}
+          </button>
+          <button className={`sb-item ${view === "settings" ? "on" : ""}`} onClick={() => go("settings")}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>Settings
+          </button>
+          <button className="sb-item" onClick={demo ? onExitDemo : onLogout}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
+            {demo ? "Exit sample" : "Log out"}
+          </button>
         </div>
-      )}
-
-      <div className="filters" role="tablist" aria-label="Filter stories">
-        <button role="tab" aria-selected={filter === "top"} className={`chip ${filter === "top" ? "on" : ""}`} onClick={() => pick("top")}>Top stories</button>
-        {topicList.map((t) => {
-          const loadingT = !!busy[bkey(leg, t)];
-          return (
-            <button key={t} role="tab" aria-selected={filter === t} className={`chip ${filter === t ? "on" : ""}`} onClick={() => pick(t)}>
-              {t}
-              {loadingT ? <span className="spin" aria-label="loading" /> : countFor(t) > 0 && <span className="count">{countFor(t)}</span>}
-            </button>
-          );
-        })}
-      </div>
-
-      {feed?.source === "sample" && (
-        <div className="banner">Sample mode: no API key is configured, so these are placeholders. Live mode pulls real articles.</div>
-      )}
-      {feed?.note && filter === "top" && (
-        <div className="summary">
-          <div className="summary-label">This week in {leg.country}</div>
-          <p>{feed.note}</p>
+      </aside>
+      <main className="bf-main">
+        <div className="bf-col">
+          {body}
+          <footer className="foot">
+            Worldesk prototype · Stories are selected and translated by AI from a fixed list of local outlets. Always check the original before you quote it.
+          </footer>
         </div>
-      )}
-
-      {visible.length === 0 && startedAt && (
-        <Progress startedAt={startedAt} leg={leg} profile={profile} topic={filter === "top" ? undefined : filter} />
-      )}
-      {error && (
-        <div className="error">
-          Couldn&apos;t load stories ({error}).{" "}
-          <button className="btn link" onClick={() => fetchMore(leg, filter)}>Try again</button>
-        </div>
-      )}
-      {visible.length === 0 && !startedAt && !error && feed && (
-        <p className="muted">No {filter === "top" ? "" : filter + " "}stories from our {leg.country} outlets yet. Try &quot;Load more&quot;.</p>
-      )}
-
-      {visible.map((a, i) => (
-        <article key={a.url} data-url={a.url} className={`story ${i === 0 && filter === "top" ? "lead" : ""}`}>
-          <div className="story-meta">
-            <button className="tag" onClick={() => topicList.includes(a.category) && pick(a.category)}>{a.category}</button>
-            {isNew(a.url) && <span className="new">New</span>}
-            <span className="outlet">{a.outlet}</span>
-            {a.date && <span>{fmt(a.date.slice(0, 10))}</span>}
-            {a.verified && <span className="verified">✓ Source verified</span>}
-          </div>
-          <h3>{a.english_headline}</h3>
-          <p className="sum">{a.summary}</p>
-          <div className="why"><b>Why it matters to you</b>{a.why_it_matters}</div>
-          <a className="read" href={a.url} target="_blank" rel="noopener noreferrer">
-            Read the original in {market?.language ?? "the local language"} ↗
-          </a>
-        </article>
-      ))}
-
-      {notice[k] && <p className="small muted" style={{ textAlign: "center", marginTop: 16 }}>{notice[k]}</p>}
-      {feed && visible.length > 0 && (
-        <div className="more">
-          {startedAt ? (
-            <Progress startedAt={startedAt} leg={leg} profile={profile} topic={filter === "top" ? undefined : filter} compact />
-          ) : (
-            <button className="btn ghost" onClick={() => fetchMore(leg, filter)}>
-              Load 5 more {filter === "top" ? "stories" : filter}
-            </button>
-          )}
-        </div>
-      )}
-
-      <footer className="foot">
-        Worldesk prototype · Stories are selected and translated by AI from a fixed list of local outlets. Always check the original before you quote it.
-      </footer>
-    </section>
+      </main>
+    </div>
   );
 }
 
