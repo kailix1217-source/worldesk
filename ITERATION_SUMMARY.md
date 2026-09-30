@@ -1,6 +1,6 @@
 # Worldesk Iteration Log
 
-**Live prototype:** https://worldesk.vercel.app
+**Live prototype:** https://worldesk.vercel.app · **Code:** https://github.com/kailix1217-source/worldesk
 
 I built Worldesk in one evening with Claude Code, starting from our group's project report. I worked in a loop: give feedback (often in Chinese) → have the AI turn it into a structured English prompt → build → test in the browser, mobile width first → record the change. The product moved through six phases: scope the idea, build the core flow, make the news trustworthy and fast, make the briefing worth returning to, give it a visual identity, and ship it. For UI ideas I used **tweakcn.com** (a ready-made theme) and **variant.com** (reference designs for the landing page).
 
@@ -153,3 +153,71 @@ Following four reference screens but in Worldesk's own colors: Create your accou
 **Prompt** (translated from Chinese, abridged):
 
 > I want to change Worldesk's onboarding. After I tap "Set up my briefing", split the old "Tell us about your work" page into several steps, like the four reference images: first "Create your account" (name, email, password, or "Log in"); then "About you" (job title, function, industry, company); then "Choose your markets", using the countries in the example; then "Choose topics" (regulation and policy, competitors, market and economy, consumer trends, labor, trade and tariffs, technology). Remove the "Where are you headed?" page, so after these steps you go straight to "Build my briefing". Keep the layouts from the references, but keep Worldesk's original colors, not the dark background in the images.
+
+### 17. Keep every step's title at the same height
+
+Every onboarding step now starts at the same height (measured: identical on all four), and the brand banner moved below the Continue button. Also fixed the banner art being clipped by the rounded corner and touching the wordmark on phones.
+
+**Prompt** (translated from Chinese):
+
+> When I create my account, the big title is at eye level, but on "About you" a Worldesk banner suddenly appears above it and pushes my eye down. Can you put "About you" at the same level as the previous step, and the same for "Choose your markets" and "Choose topics"? Keep the Worldesk banner looking good, but change its placement.
+
+### 18. Three authoritative outlets per market
+
+Researched trust data (Reuters Institute Digital News Report 2026) and chose, per market, the public broadcaster or news agency, the newspaper of record and the leading business daily; China uses Xinhua, People's Daily and CCTV. Then tested all 36 outlets against the search: Japan's big papers returned nothing in Japanese (so Japan showed 0 stories), and Franceinfo and some Canadian outlets were unreachable, so they were replaced with the most authoritative reachable ones. Market cards now show only the country name.
+
+**Prompt** (translated from Chinese):
+
+> Can you search online again for the most authoritative local media in each of these 12 markets? Give three different, authoritative outlets per country; for China, for example, Xinhua, People's Daily and CCTV. There's no need to show the sources on "Choose your markets"; just write United States, United Kingdom, Germany and so on.
+
+### 19. Redesign the briefing for desktop
+
+A left sidebar (All markets, the chosen markets, Saved stories, Settings, Log out) and a feed. "All markets" merges every market newest first under a one-line-per-market summary. New story card: meta line (topic · outlet · country · date), title, then "Why it matters"; the summary expands from a bottom-right button; the footer shows "N sources" with a "View <outlet>" button each. Added bookmarks and moved alerts and profile editing into Settings. On phones the sidebar becomes a top bar with scrollable market tabs.
+
+**Prompt** (translated from Chinese, abridged):
+
+> [reference screenshots of a dark sidebar-and-feed news app] I want the briefing to look like this, for desktop. First "All markets", then "Selected markets" (the ones the user ticked at signup). Keep the top summary. Make the story cards narrower: title first, then "Why it matters to you"; if I want more, a dropdown at the bottom-right expands the card to show the summary. Can each card have a picture on the left? Above the title keep topic, source name, country, then date, without "Source verified"; at the bottom, the date, how many sources, and buttons linking to each original source.
+
+### 20. World Bank key figures on each market
+
+The AI proposed six indicators from the World Bank's Social and Economic sections (GDP growth, GDP, GDP per capita, inflation, unemployment using the comparable ILO-modelled series, population) and explained what it left out. After approval, each market page got a ticker-style strip in Worldesk colors: value, change vs the previous year, and a link to the country's World Bank page.
+
+**Prompt** (translated from Chinese):
+
+> https://data.worldbank.org/country/china: can you add related indicators on each market, chosen from Social and Economic? The data can all be found on the World Bank for each country. First tell me which indicators you would show, and only start after I say approve.
+>
+> Follow-ups: What about the unemployment rate? / OK, I think it can look like this [stock-ticker screenshot], using Worldesk's color palette.
+
+### 21. Make Settings edits save back to Settings
+
+"Edit markets" in Settings used to drop the user back into the signup flow (markets → topics → rebuilding the briefing). Now it opens the same screen as a one-step editor with Cancel / Save changes that returns straight to Settings. Job functions grew from 5 to 14 (incl. Product Management, Data & Analytics, Software & Engineering, Research & Analysis), and the About-you banner became smaller.
+
+**Prompt** (translated from Chinese, abridged):
+
+> The Worldesk banner is too low; make it narrower and move it up. The job functions are too few: there should be tech roles like data analytics, software engineer, product manager or analyst. In Settings, when I click Edit markets or Edit topics, it jumps to the start of signup, and after picking markets it doesn't return to my profile: it continues to topics and immediately regenerates the briefing. That flow is wrong. After editing, the button should become something like "Save profile" and take me back to Settings.
+
+### 22. Rethink pictures: one lead image per view
+
+Added Caixin to China and hid the data year on the indicator strip. Then asked the AI, as a product manager, whether every card needs a picture. Its answer: no (the value is the words; images cost space, load time and licensing risk, and coverage is patchy). Each view now has one lead image; every other story is a compact text card. The previous version is kept on the image-cards branch for a side-by-side test.
+
+**Prompt** (translated from Chinese):
+
+> Can China's sources also include Caixin? I don't think we need to show the 2025 numbers. And if you were the product manager, what would you do if an article has no picture?
+>
+> Follow-ups: Do you think we necessarily need to include a picture? / Yes (build the lead-image version).
+
+### 23. Find the real pictures
+
+Some tabs had a lead image and others didn't, and China had none. It was mostly a detection problem: Caixin's preview image is small but a larger copy sits in the article, and Xinhua and People's Daily put photos only in the article body. The server now collects in-article photos (skipping QR codes and logos), a lead must be landscape and at least 800 px wide, and the search draws on every listed outlet. China went from 0 of 5 tabs with a lead image to 5 of 5.
+
+**Prompt** (translated from Chinese):
+
+> The picture only shows in some tabs: Competitors has none, Consumer Trends has one, Markets & Economy and Regulation & Policy have none. If I click China in Selected markets, its top stories have no picture at all, while France has pictures in every tab. You should add Caixin for China, because I think Caixin has pictures.
+
+### 24. Push and redeploy
+
+Pushed all changes to GitHub, redeployed worldesk.vercel.app, and recorded this log.
+
+**Prompt**:
+
+> Push to GitHub and deploy to Vercel, also record the iteration log.
