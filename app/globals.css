@@ -616,3 +616,14 @@ article.story[data-url] { padding: 24px 26px; margin-top: 18px; }
 .tk-nav button:not(:disabled):hover { background: var(--fill); }
 .tk-nav svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 @media (max-width: 640px) { .tk-nav { display: none; } .tk-rail { padding: 11px 14px; gap: 20px; } }
+
+/* ---------- v24: one lead image per view; everything else is a compact text card ---------- */
+.sc { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; }
+.sc-foot { grid-column: 1; }
+.sc.lead .sc-media { grid-row: auto; min-height: 0; aspect-ratio: 16 / 9; max-height: 380px; width: 100%; }
+.sc.lead h3 { font-size: 26px; }
+.sc.compact { margin-top: 12px; }
+.sc.compact .sc-body { padding: 18px 22px 12px; }
+.sc.compact h3 { font-size: 19.5px; margin: 8px 0 10px; }
+@media (max-width: 640px) { .sc.lead h3 { font-size: 21px; } .sc.compact h3 { font-size: 18px; } }
+.sc-toggle { margin-left: auto; } /* stays bottom-right even when the footer wraps */

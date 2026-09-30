@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ONBOARD_MARKETS, marketFor } from "@/lib/sources";
-import { DOTS, PIN_OF, PINS, WORLD } from "@/lib/worldDots";
+import { DOTS, PINS, WORLD } from "@/lib/worldDots";
 import {
   FUNCTIONS, INDUSTRIES, TOPICS,
   type Article, type Briefing, type Leg, type Profile,
@@ -532,34 +532,23 @@ function relDate(d: string) {
 }
 const sourcesOf = (a: Article) => (a.sources?.length ? a.sources : [{ outlet: a.outlet, url: a.url }]);
 
-// Fallback thumbnail when an outlet publishes no preview image: the dotted map around that market.
-function MapThumb({ country }: { country: string }) {
-  const [x, y] = PIN_OF[country] ?? [77, 18];
-  const w = useMemo(() => mapWindow(x, y), [x, y]);
-  return (
-    <svg className="sc-map" viewBox={w.viewBox} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-      <path d={w.dots} className="bb-dark-dot" />
-      <circle cx={x} cy={y} r={PIN_R * 2.4} className="bb-halo" />
-      <circle cx={x} cy={y} r={PIN_R * 1.1} className="bb-pin" />
-    </svg>
-  );
-}
-
-function StoryCard({ a, isNew, saved, onSave, onTag }: {
-  a: Article; isNew: boolean; saved: boolean; onSave: () => void; onTag: (t: string) => void;
+// Only a view's lead story carries a picture; every other story is a compact text card.
+function StoryCard({ a, lead, isNew, saved, onSave, onTag }: {
+  a: Article; lead: boolean; isNew: boolean; saved: boolean; onSave: () => void; onTag: (t: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [imgOk, setImgOk] = useState(true);
   const country = a.country ?? "";
   const srcs = sourcesOf(a);
   const lang = marketFor(country)?.language;
+  const showImage = lead && !!a.image && imgOk;
   return (
-    <article className="sc" data-url={a.url}>
-      <div className="sc-media">
-        {a.image && imgOk
-          ? <img src={a.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setImgOk(false)} />
-          : <MapThumb country={country} />}
-      </div>
+    <article className={`sc ${showImage ? "lead" : "compact"}`} data-url={a.url}>
+      {showImage && (
+        <div className="sc-media">
+          <img src={a.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setImgOk(false)} />
+        </div>
+      )}
       <div className="sc-body">
         <div className="sc-meta">
           <button className="tag" onClick={() => onTag(a.category)}>{a.category}</button>
@@ -686,6 +675,8 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
   const [alerts, setAlerts] = useState<Alerts>(() => ({ ...ALERT_DEFAULT, ...load<Partial<Alerts>>("wd.alerts", {}) }));
   const [alertMsg, setAlertMsg] = useState("");
   const [saved, setSaved] = useState<Article[]>(() => load<Article[]>("wd.saved", []));
+  // Natural width of each story image, measured in the browser; only sharp images (>= 960px) can lead a view.
+  const [imgWidth, setImgWidth] = useState<Record<string, number>>({});
   const feedsRef = useRef(feeds);
   feedsRef.current = feeds;
   const inflight = useRef<Set<string>>(new Set()); // synchronous guard against duplicate requests
@@ -793,6 +784,19 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
   // All markets searches only when that view is on screen (not, e.g., when returning to Settings).
   useEffect(() => { if (view === "all") loadAll(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [view]);
 
+  useEffect(() => {
+    const pending = [...new Set(Object.values(feeds).flatMap((f) => f.articles.map((a) => a.image)).filter((u): u is string => !!u && !(u in imgWidth)))];
+    pending.forEach((u) => {
+      const im = new Image();
+      im.referrerPolicy = "no-referrer";
+      im.onload = () => setImgWidth((w) => ({ ...w, [u]: im.naturalWidth }));
+      im.onerror = () => setImgWidth((w) => ({ ...w, [u]: 0 }));
+      im.src = u;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feeds]);
+  const LEAD_MIN_WIDTH = 960;
+
   const isNew = (url: string) => seenBefore.current.size > 0 && !seenBefore.current.has(url);
   const isSaved = (url: string) => saved.some((s) => s.url === url);
   const toggleSave = (a: Article) => {
@@ -844,10 +848,15 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
   const market = leg ? marketFor(leg.country) : undefined;
   const loadingMarkets = legs.filter((l) => busy[bkey(l, "top")]);
 
-  const renderCards = (list: Article[]) => list.map((a) => (
-    <StoryCard key={a.url} a={a} isNew={isNew(a.url)} saved={isSaved(a.url)} onSave={() => toggleSave(a)}
-      onTag={(t) => { if (topicList.includes(t)) setFilter(t); }} />
-  ));
+  // The lead is the highest-ranked story with a sharp, real image; it moves to the top. No such image, no lead.
+  const renderCards = (list: Article[], withLead = true) => {
+    const lead = withLead ? list.find((a) => a.image && (imgWidth[a.image] ?? 0) >= LEAD_MIN_WIDTH) : undefined;
+    const ordered = lead ? [lead, ...list.filter((a) => a !== lead)] : list;
+    return ordered.map((a) => (
+      <StoryCard key={a.url} a={a} lead={a === lead} isNew={isNew(a.url)} saved={isSaved(a.url)} onSave={() => toggleSave(a)}
+        onTag={(t) => { if (topicList.includes(t)) setFilter(t); }} />
+    ));
+  };
   const Chips = ({ onPick, counts }: { onPick: (t: string) => void; counts: (t: string) => number }) => (
     <div className="filters" role="tablist" aria-label="Filter stories">
       <button role="tab" aria-selected={filter === "top"} className={`chip ${filter === "top" ? "on" : ""}`} onClick={() => onPick("top")}>Top stories</button>
@@ -974,7 +983,7 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
           <h1>Saved stories</h1>
           <p>{saved.length ? `${saved.length} saved ${saved.length === 1 ? "story" : "stories"}, newest first. Kept in this browser.` : "Tap the bookmark on any story to keep it here."}</p>
         </header>
-        {renderCards(saved)}
+        {renderCards(saved, false)}
       </>
     );
   } else {
