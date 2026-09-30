@@ -57,6 +57,7 @@ You ONLY use articles published by these trusted ${market.country} outlets: ${ou
 Write every search query in ${market.language}, the way a local reader would, and use only ${market.language}-language articles.${
     market.language === "English" ? "" : ` Never use English-language editions (e.g. NHK World, Nikkei Asia, "/en/" pages).`
   } Never invent articles, headlines or URLs: every url must be the exact article URL from your search results.
+Draw on as many of the listed outlets as possible: include at least one story from each outlet that has relevant coverage, rather than taking everything from one.
 At least half of the stories must be directly about the reader's industry; the rest may be the local economy or policy that affects it. If you do not have the exact original headline, return an empty string for original_headline rather than a placeholder. Skip opinion pieces, horoscopes, sports and celebrity news.`;
 
   const employer = profile.company?.trim() ? `${profile.company.trim()}, a ${profile.industry} company` : `a ${profile.industry} company`;
@@ -166,25 +167,38 @@ function clean(
   return verified.length >= 3 ? verified : out;
 }
 
-// The article's own preview image, read from its og:image / twitter:image tag. URLs are already
-// limited to whitelisted outlets; anything slow, blocked or odd just means "no image".
-async function previewImage(url: string): Promise<string | undefined> {
+// Candidate pictures from the article page itself: the preview tags first, then photos inside the
+// article (some outlets, e.g. Xinhua and People's Daily, publish no preview tag). URLs are already limited
+// to whitelisted outlets; anything slow, blocked or odd just means fewer candidates.
+const JUNK = /logo|icon|avatar|qr|zxcode|ewm|erweima|weixin|wechat|arrow|share|btn|button|banner|sprite|blank|placeholder|default|ad[_-]|\/ads?\//i;
+async function articleImages(url: string): Promise<string[]> {
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(3000),
       headers: { "User-Agent": "Mozilla/5.0 (compatible; WorldeskPreview/1.0)", Accept: "text/html" },
       redirect: "follow",
     });
-    if (!res.ok || !res.headers.get("content-type")?.includes("html")) return;
-    const head = (await res.text()).slice(0, 200_000);
-    const m =
-      head.match(/<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]*content=["']([^"']+)["']/i) ??
-      head.match(/<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["'](?:og:image|twitter:image)["']/i);
-    if (!m) return;
-    const img = new URL(m[1].replace(/&amp;/g, "&"), url);
-    return img.protocol === "https:" ? img.href : undefined;
+    if (!res.ok || !res.headers.get("content-type")?.includes("html")) return [];
+    const html = (await res.text()).slice(0, 400_000);
+    const found: string[] = [];
+    for (const re of [
+      /<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]*content=["']([^"']+)["']/gi,
+      /<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["'](?:og:image|twitter:image)["']/gi,
+      /<img[^>]+src=["']([^"']+\.(?:jpe?g|png|webp)(?:\?[^"']*)?)["']/gi,
+    ]) for (const m of html.matchAll(re)) found.push(m[1]);
+    const out: string[] = [];
+    for (const raw of found) {
+      if (JUNK.test(raw)) continue;
+      try {
+        const u = new URL(raw.replace(/&amp;/g, "&"), url);
+        if (u.protocol === "http:") u.protocol = "https:"; // the site is served over https
+        if (u.protocol === "https:" && !out.includes(u.href)) out.push(u.href);
+      } catch { /* skip malformed */ }
+      if (out.length >= 5) break;
+    }
+    return out;
   } catch {
-    return;
+    return [];
   }
 }
 
@@ -207,10 +221,10 @@ export async function POST(req: Request) {
       articles = clean(parsed, results, market, r.exclude, r.topic);
     }
     const top = articles.slice(0, r.count);
-    const images = await Promise.all(top.map((a) => previewImage(a.url)));
+    const images = await Promise.all(top.map((a) => articleImages(a.url)));
     const briefing: Briefing = {
       landing_note: parsed.landing_note,
-      articles: top.map((a, i) => (images[i] ? { ...a, image: images[i] } : a)),
+      articles: top.map((a, i) => (images[i].length ? { ...a, image: images[i][0], images: images[i] } : a)),
       source: "live",
     };
     return NextResponse.json(briefing);

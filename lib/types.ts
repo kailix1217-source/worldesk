@@ -32,6 +32,7 @@ export type Article = {
   origin?: string; // client-side: which filter request loaded it ("top" or a topic)
   sources?: { outlet: string; url: string }[]; // every whitelisted outlet that ran the story, primary first
   image?: string; // the article's own preview image (og:image), when the outlet publishes one
+  images?: string[]; // candidate pictures from the article page (preview tag first, then in-article photos)
   country?: string; // client-side: the market the story was loaded for
   also_reported_by?: { outlet: string; url: string }[]; // raw model output, verified into `sources`
 };

@@ -675,8 +675,8 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
   const [alerts, setAlerts] = useState<Alerts>(() => ({ ...ALERT_DEFAULT, ...load<Partial<Alerts>>("wd.alerts", {}) }));
   const [alertMsg, setAlertMsg] = useState("");
   const [saved, setSaved] = useState<Article[]>(() => load<Article[]>("wd.saved", []));
-  // Natural width of each story image, measured in the browser; only sharp images (>= 960px) can lead a view.
-  const [imgWidth, setImgWidth] = useState<Record<string, number>>({});
+  // Size of each candidate picture, measured in the browser (0 = failed to load or blocked).
+  const [imgSize, setImgSize] = useState<Record<string, { w: number; h: number }>>({});
   const feedsRef = useRef(feeds);
   feedsRef.current = feeds;
   const inflight = useRef<Set<string>>(new Set()); // synchronous guard against duplicate requests
@@ -692,7 +692,7 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
   }, [feeds]);
 
   const cacheKey = (leg: Leg) =>
-    `wd.feed3.${leg.country}.${profile.industry}.${profile.func}.${profile.company}.${profile.topics.join(",")}.${iso(new Date())}`;
+    `wd.feed4.${leg.country}.${profile.industry}.${profile.func}.${profile.company}.${profile.topics.join(",")}.${iso(new Date())}`;
   const bkey = (leg: Leg, f: string) => `${leg.id}|${f}`;
 
   const fetchMore = async (leg: Leg, f: string, reset = false, preloadTopics = false) => {
@@ -785,17 +785,22 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
   useEffect(() => { if (view === "all") loadAll(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [view]);
 
   useEffect(() => {
-    const pending = [...new Set(Object.values(feeds).flatMap((f) => f.articles.map((a) => a.image)).filter((u): u is string => !!u && !(u in imgWidth)))];
-    pending.forEach((u) => {
+    const all = Object.values(feeds).flatMap((f) => f.articles.flatMap((a) => a.images ?? (a.image ? [a.image] : [])));
+    [...new Set(all)].filter((u) => !(u in imgSize)).forEach((u) => {
       const im = new Image();
       im.referrerPolicy = "no-referrer";
-      im.onload = () => setImgWidth((w) => ({ ...w, [u]: im.naturalWidth }));
-      im.onerror = () => setImgWidth((w) => ({ ...w, [u]: 0 }));
+      im.onload = () => setImgSize((m) => ({ ...m, [u]: { w: im.naturalWidth, h: im.naturalHeight } }));
+      im.onerror = () => setImgSize((m) => ({ ...m, [u]: { w: 0, h: 0 } }));
       im.src = u;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [feeds]);
-  const LEAD_MIN_WIDTH = 960;
+  // A lead picture must fill the 800px column and be landscape (rules out QR codes, logos and tall charts).
+  const leadImage = (a: Article) =>
+    (a.images ?? (a.image ? [a.image] : [])).find((u) => {
+      const z = imgSize[u];
+      return !!z && z.w >= 800 && z.w / z.h >= 1.2 && z.w / z.h <= 2.4;
+    });
 
   const isNew = (url: string) => seenBefore.current.size > 0 && !seenBefore.current.has(url);
   const isSaved = (url: string) => saved.some((s) => s.url === url);
@@ -850,10 +855,10 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
 
   // The lead is the highest-ranked story with a sharp, real image; it moves to the top. No such image, no lead.
   const renderCards = (list: Article[], withLead = true) => {
-    const lead = withLead ? list.find((a) => a.image && (imgWidth[a.image] ?? 0) >= LEAD_MIN_WIDTH) : undefined;
+    const lead = withLead ? list.find((a) => leadImage(a)) : undefined;
     const ordered = lead ? [lead, ...list.filter((a) => a !== lead)] : list;
     return ordered.map((a) => (
-      <StoryCard key={a.url} a={a} lead={a === lead} isNew={isNew(a.url)} saved={isSaved(a.url)} onSave={() => toggleSave(a)}
+      <StoryCard key={a.url} a={a === lead ? { ...a, image: leadImage(a) } : a} lead={a === lead} isNew={isNew(a.url)} saved={isSaved(a.url)} onSave={() => toggleSave(a)}
         onTag={(t) => { if (topicList.includes(t)) setFilter(t); }} />
     ));
   };
