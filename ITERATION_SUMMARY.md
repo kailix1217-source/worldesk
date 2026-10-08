@@ -221,3 +221,11 @@ Pushed all changes to GitHub, redeployed worldesk.vercel.app, and recorded this 
 **Prompt**:
 
 > Push to GitHub and deploy to Vercel, also record the iteration log.
+
+### 25. Keywords to personalize the search
+
+A "Keywords to track" field on the About you step (and Settings → Edit profile): type a company, product, policy or person and press Enter (or paste a comma-separated list); up to 8 keywords, with one-tap suggestions for the chosen industry. The search translates them into each market's language and ranks matching stories first, and every matching card shows an orange keyword tag. Matches are checked against the user's own list so the AI cannot invent one. In testing, 6 of 11 stories for the sample executive were tagged, and a paste bug (only the last of several keywords was kept) was found and fixed.
+
+**Prompt**:
+
+> I want to add a feature in the page where asking the job functions and industry. I want to add a keyword feature, where allows user to type keywords to personalize their search.

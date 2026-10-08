@@ -7,6 +7,7 @@ export type Profile = {
   func: string;
   markets: string[]; // country names from ONBOARD_MARKETS
   topics: string[];
+  keywords?: string[]; // free-text terms the reader tracks (companies, products, policies); max 8
   ageRange?: string; // legacy fields from the first version
   homeCountry?: string;
 };
@@ -34,6 +35,7 @@ export type Article = {
   image?: string; // the article's own preview image (og:image), when the outlet publishes one
   images?: string[]; // candidate pictures from the article page (preview tag first, then in-article photos)
   country?: string; // client-side: the market the story was loaded for
+  keywords?: string[]; // which of the reader's keywords this story is about (checked against their list)
   also_reported_by?: { outlet: string; url: string }[]; // raw model output, verified into `sources`
 };
 
@@ -55,6 +57,18 @@ export const INDUSTRIES = [
   "Energy",
   "Consumer Goods",
 ];
+
+// Suggested keywords per industry, offered as one-tap chips on the About you step.
+export const KEYWORD_SUGGESTIONS: Record<string, string[]> = {
+  Automotive: ["EV batteries", "Autonomous driving", "Chinese EV brands", "Tariffs on cars"],
+  "Financial Services": ["Interest rates", "Fintech", "Banking regulation", "Digital payments"],
+  "Healthcare & Life Sciences": ["Drug pricing", "Clinical trials", "Medical devices", "Biotech funding"],
+  "Management Consulting": ["Digital transformation", "M&A activity", "Public sector contracts", "AI adoption"],
+  Technology: ["Semiconductors", "AI regulation", "Data centers", "Cybersecurity"],
+  Energy: ["LNG", "Renewables", "Grid investment", "Carbon pricing"],
+  "Consumer Goods": ["Retail sales", "E-commerce", "Consumer confidence", "Private labels"],
+};
+export const MAX_KEYWORDS = 8;
 
 export const FUNCTIONS = [
   "General Management",

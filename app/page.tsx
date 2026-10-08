@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ONBOARD_MARKETS, marketFor } from "@/lib/sources";
 import { DOTS, PINS, WORLD } from "@/lib/worldDots";
 import {
-  FUNCTIONS, INDUSTRIES, TOPICS,
+  FUNCTIONS, INDUSTRIES, KEYWORD_SUGGESTIONS, MAX_KEYWORDS, TOPICS,
   type Article, type Briefing, type Leg, type Profile,
 } from "@/lib/types";
 
@@ -12,7 +12,7 @@ type Step = "welcome" | "account" | "about" | "markets" | "topics" | "briefing";
 const ONBOARDING: Step[] = ["account", "about", "markets", "topics"];
 
 const EMPTY_PROFILE: Profile = {
-  name: "", email: "", title: "", company: "", industry: "", func: "", markets: [], topics: [],
+  name: "", email: "", title: "", company: "", industry: "", func: "", markets: [], topics: [], keywords: [],
 };
 
 const iso = (d: Date) =>
@@ -23,7 +23,7 @@ const fmt = (d: string) =>
 const DEMO_PROFILE: Profile = {
   name: "Maya", email: "maya@example.com", title: "Marketing Director, EMEA & APAC", company: "",
   industry: "Automotive", func: "Marketing & Communications", markets: ["Germany", "Japan"],
-  topics: ["Competitors", "Consumer Trends", "Regulation & Policy"],
+  topics: ["Competitors", "Consumer Trends", "Regulation & Policy"], keywords: ["EV batteries", "Chinese EV brands"],
 };
 
 function load<T>(key: string, fallback: T): T {
@@ -36,7 +36,7 @@ function save(key: string, value: unknown) {
 // Profiles saved by the trip-based version have no markets: derive them from the old trip stops.
 function loadProfile(): Profile {
   const stored = load<Partial<Profile>>("wd.profile", {});
-  const p: Profile = { ...EMPTY_PROFILE, ...stored, markets: stored.markets ?? [], topics: stored.topics ?? [] };
+  const p: Profile = { ...EMPTY_PROFILE, ...stored, markets: stored.markets ?? [], topics: stored.topics ?? [], keywords: stored.keywords ?? [] };
   if (!p.markets.length) {
     const legs = load<Leg[]>("wd.legs", []);
     const offered = new Set(ONBOARD_MARKETS.map((m) => m.country));
@@ -407,6 +407,58 @@ function EditActions({ edit, canSave }: { edit: EditMode; canSave: boolean }) {
   );
 }
 
+// Free-text keywords as removable chips: Enter or comma adds one, Backspace on an empty field removes the last.
+function KeywordInput({ value, onChange, industry }: { value: string[]; onChange: (v: string[]) => void; industry: string }) {
+  const [draft, setDraft] = useState("");
+  const full = value.length >= MAX_KEYWORDS;
+  // Adds one or many (a pasted "a, b, c" list) in a single update, skipping blanks and duplicates.
+  const add = (...raws: string[]) => {
+    const next = [...value];
+    for (const raw of raws) {
+      const k = raw.replace(/\s+/g, " ").trim().slice(0, 40);
+      if (k && next.length < MAX_KEYWORDS && !next.some((v) => v.toLowerCase() === k.toLowerCase())) next.push(k);
+    }
+    if (next.length !== value.length) onChange(next);
+  };
+  const suggestions = (KEYWORD_SUGGESTIONS[industry] ?? []).filter((s) => !value.some((v) => v.toLowerCase() === s.toLowerCase()));
+  return (
+    <div className="field">
+      <label htmlFor="ab-kw">Keywords to track (optional)</label>
+      <div className="kw-box" onClick={() => document.getElementById("ab-kw")?.focus()}>
+        {value.map((k) => (
+          <span key={k} className="kw-chip">
+            {k}
+            <button type="button" onClick={() => onChange(value.filter((v) => v !== k))} aria-label={`Remove ${k}`}>×</button>
+          </span>
+        ))}
+        <input id="ab-kw" value={draft} disabled={full} maxLength={40}
+          placeholder={full ? `Up to ${MAX_KEYWORDS} keywords` : value.length ? "Add another…" : "e.g. BYD, battery recycling, EU tariffs"}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v.includes(",")) {
+              const parts = v.split(",");
+              const rest = parts.pop() ?? ""; // text after the last comma keeps being typed
+              add(...parts);
+              setDraft(rest.trimStart());
+            } else setDraft(v);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); add(draft); setDraft(""); }
+            else if (e.key === "Backspace" && !draft && value.length) onChange(value.slice(0, -1));
+          }}
+          onBlur={() => { if (draft.trim()) { add(draft); setDraft(""); } }} />
+      </div>
+      <span className="kw-help">Companies, products, policies or people. Press Enter to add. We search for them in each market&apos;s language.</span>
+      {suggestions.length > 0 && !full && (
+        <div className="kw-suggest">
+          <span>Suggested for {industry}:</span>
+          {suggestions.map((s) => <button type="button" key={s} className="chip" onClick={() => add(s)}>+ {s}</button>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AboutStep({ profile, setProfile, edit, onBack, onNext }: {
   profile: Profile; setProfile: (p: Profile) => void; edit?: EditMode; onBack: () => void; onNext: () => void;
 }) {
@@ -438,6 +490,7 @@ function AboutStep({ profile, setProfile, edit, onBack, onNext }: {
           <label htmlFor="ab-co">Company (optional)</label>
           <input id="ab-co" value={profile.company} onChange={(e) => set("company", e.target.value)} placeholder="e.g. Acme Motors" />
         </div>
+        <KeywordInput value={profile.keywords ?? []} onChange={(v) => set("keywords", v)} industry={profile.industry} />
       </div>
       {edit ? <EditActions edit={edit} canSave={!!valid} /> : (
         <div className="actions">
@@ -553,6 +606,7 @@ function StoryCard({ a, lead, isNew, saved, onSave, onTag }: {
         <div className="sc-meta">
           <button className="tag" onClick={() => onTag(a.category)}>{a.category}</button>
           {isNew && <span className="new">New</span>}
+          {(a.keywords ?? []).map((k) => <span key={k} className="kw-hit" title="Matches a keyword you track">{k}</span>)}
           <b>{a.outlet}</b>
           {country && <><i aria-hidden="true">·</i><span>{country}</span></>}
           {a.date && <><i aria-hidden="true">·</i><span>{relDate(a.date)}</span></>}
@@ -692,7 +746,7 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
   }, [feeds]);
 
   const cacheKey = (leg: Leg) =>
-    `wd.feed4.${leg.country}.${profile.industry}.${profile.func}.${profile.company}.${profile.topics.join(",")}.${iso(new Date())}`;
+    `wd.feed4.${leg.country}.${profile.industry}.${profile.func}.${profile.company}.${profile.topics.join(",")}.${(profile.keywords ?? []).join(",")}.${iso(new Date())}`;
   const bkey = (leg: Leg, f: string) => `${leg.id}|${f}`;
 
   const fetchMore = async (leg: Leg, f: string, reset = false, preloadTopics = false) => {
@@ -996,6 +1050,7 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
       ["Name", profile.name], ["Email", profile.email || "—"], ["Job title", profile.title],
       ["Company", profile.company || "—"], ["Industry", profile.industry], ["Function", profile.func],
       ["Markets", profile.markets.join(", ")], ["Topics", profile.topics.join(", ") || "All topics"],
+      ["Keywords", (profile.keywords ?? []).join(", ") || "—"],
     ];
     body = (
       <>

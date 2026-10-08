@@ -628,3 +628,18 @@ article.story[data-url] { padding: 24px 26px; margin-top: 18px; }
 @media (max-width: 640px) { .sc.lead h3 { font-size: 21px; } .sc.compact h3 { font-size: 18px; } }
 .sc-toggle { margin-left: auto; } /* stays bottom-right even when the footer wraps */
 .sc-count { flex: 1 1 auto; margin-right: 0; } /* absorbs the free space so source buttons sit right, next to the toggle */
+
+/* ---------- v27: keyword tracking ---------- */
+.kw-box { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 52px; padding: 8px 12px 8px 14px; background: var(--fill);
+  border-radius: 26px; border: 1px solid transparent; cursor: text; }
+.kw-box:focus-within { outline: 2px solid var(--ink); outline-offset: 1px; }
+.kw-box input { flex: 1 1 160px; min-width: 120px; border: 0; outline: 0; background: transparent; padding: 6px 6px; font: inherit; font-size: 16px; color: var(--ink); }
+.field .kw-box input:focus { outline: 0; }
+.kw-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--paper-card); border: 1px solid var(--card-line); border-radius: 999px;
+  padding: 5px 6px 5px 12px; font-size: 14px; font-weight: 500; }
+.kw-chip button { width: 22px; height: 22px; border-radius: 50%; border: 0; background: none; color: var(--muted); font-size: 16px; line-height: 1; }
+.kw-chip button:hover { background: var(--fill); color: var(--ink); }
+.kw-help { font-size: 12.5px; color: var(--muted); }
+.kw-suggest { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; font-size: 12.5px; color: var(--muted); }
+.kw-suggest .chip { padding: 5px 11px; font-size: 12.5px; }
+.kw-hit { font-size: 11.5px; font-weight: 600; color: var(--signal-text); background: var(--signal-tint); border: 1px solid #f6c9b4; border-radius: 999px; padding: 2px 9px; }

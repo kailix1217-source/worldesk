@@ -22,6 +22,7 @@ const SCHEMA = {
           why_it_matters: { type: "string" },
           url: { type: "string" },
           category: { type: "string", enum: TOPICS },
+          keywords: { type: "array", items: { type: "string" } },
           also_reported_by: {
             type: "array",
             items: { type: "object", properties: { outlet: { type: "string" }, url: { type: "string" } }, required: ["outlet", "url"] },
@@ -47,7 +48,12 @@ type AgentResponse = {
 
 type Req = { profile: Profile; leg: Leg; count: number; topic?: string; exclude: string[] };
 
+// The reader's own keywords: trimmed, single-line, short, at most 8.
+const keywordsOf = (p: Profile) =>
+  (p.keywords ?? []).map((k) => k.replace(/\s+/g, " ").trim().slice(0, 40)).filter(Boolean).slice(0, 8);
+
 async function search({ profile, leg, count: wanted, topic, exclude }: Req, recency: "week" | "month") {
+  const keywords = keywordsOf(profile);
   const count = exclude.length ? wanted + 2 : wanted;
   const market = marketFor(leg.country)!;
   const outlets = market.outlets.map((o) => `${o.name} (${o.domain})`).join(", ");
@@ -68,7 +74,11 @@ At least half of the stories must be directly about the reader's industry; the r
   const context = leg.arrive ? `before meetings in ${leg.city}` : `to do business in ${leg.country}`;
 
   const user = `Reader: ${profile.title || "executive"} in ${profile.func} at ${employer}${profile.homeCountry ? `, based in ${profile.homeCountry}` : ""}.
-Topics they follow: ${profile.topics.join(", ") || "markets and economy"}.
+Topics they follow: ${profile.topics.join(", ") || "markets and economy"}.${
+    keywords.length
+      ? `\nKeywords they track: ${keywords.join("; ")}. Search for these too, translated into ${market.language} where needed, and rank stories about them first.`
+      : ""
+  }
 ${where}
 
 ${
@@ -80,6 +90,7 @@ Tag each story with exactly one category from: ${TOPICS.join(", ")}.${
     exclude.length ? `\nThe reader has already seen these, do NOT return them again:\n${exclude.slice(0, 40).join("\n")}` : ""
   }
 For each: outlet name, the original ${market.language} headline, an accurate English translation, publication date (YYYY-MM-DD), a 2-sentence English summary that keeps the local framing and tone, and one sentence "why it matters" addressed to this reader (concrete: which conversation or decision it affects${profile.company?.trim() ? `, for ${profile.company.trim()} specifically where possible` : ""}).
+keywords: which of the reader's tracked keywords (exactly as written above) the story directly mentions or is mainly about. Do not tag a keyword for a loosely related theme; when in doubt, leave it out. An empty list if none.
 also_reported_by: if another of the listed outlets also reported the same story, give its outlet name and exact article URL from your search results; otherwise an empty list.
 landing_note: one sentence on the overall business mood in ${leg.arrive ? leg.city : leg.country} this week, based only on these stories.`;
 
@@ -135,6 +146,7 @@ function clean(
   market: NonNullable<ReturnType<typeof marketFor>>,
   exclude: string[],
   topic?: string,
+  keywords: string[] = [],
 ) {
   const found = new Set(results.map((r) => r.url.replace(/\/$/, "")));
   const seen = new Set<string>(exclude.map((u) => u.replace(/\/$/, "")));
@@ -158,8 +170,11 @@ function clean(
       if (market.language !== "English" && isEnglishEdition(s.url)) continue;
       sources.push({ outlet: o.name, url: s.url });
     }
-    const { also_reported_by: _drop, ...rest } = a;
-    out.push({ ...rest, category, outlet: outlet.name, sources, verified: found.has(key) });
+    // Only keep keyword matches that are on the reader's own list
+    const mine = new Map(keywords.map((k) => [k.toLowerCase(), k]));
+    const matched = [...new Set((a.keywords ?? []).map((k) => mine.get(String(k).trim().toLowerCase())).filter((k): k is string => !!k))];
+    const { also_reported_by: _drop, keywords: _kw, ...rest } = a;
+    out.push({ ...rest, category, outlet: outlet.name, sources, keywords: matched, verified: found.has(key) });
   }
   // Prefer stories the search engine actually returned; keep unverified only as filler
   out.sort((x, y) => Number(y.verified) - Number(x.verified));
@@ -215,10 +230,11 @@ export async function POST(req: Request) {
   try {
     // Topic deep-dives look back a month so there is enough to explore; the top briefing stays on this week
     let { parsed, results, market } = await search(r, r.topic ? "month" : "week");
-    let articles = clean(parsed, results, market, r.exclude, r.topic);
+    const kw = keywordsOf(r.profile);
+    let articles = clean(parsed, results, market, r.exclude, r.topic, kw);
     if (articles.length < 3 && !r.topic) {
       ({ parsed, results, market } = await search(r, "month"));
-      articles = clean(parsed, results, market, r.exclude, r.topic);
+      articles = clean(parsed, results, market, r.exclude, r.topic, kw);
     }
     const top = articles.slice(0, r.count);
     const images = await Promise.all(top.map((a) => articleImages(a.url)));
