@@ -48,9 +48,9 @@ type AgentResponse = {
 
 type Req = { profile: Profile; leg: Leg; count: number; topic?: string; exclude: string[] };
 
-// The reader's own keywords: trimmed, single-line, short, at most 8.
+// The reader's own keywords: trimmed, single-line, short, at most 10.
 const keywordsOf = (p: Profile) =>
-  (p.keywords ?? []).map((k) => k.replace(/\s+/g, " ").trim().slice(0, 40)).filter(Boolean).slice(0, 8);
+  (p.keywords ?? []).map((k) => k.replace(/\s+/g, " ").trim().slice(0, 40)).filter(Boolean).slice(0, 10);
 
 async function search({ profile, leg, count: wanted, topic, exclude }: Req, recency: "week" | "month") {
   const keywords = keywordsOf(profile);

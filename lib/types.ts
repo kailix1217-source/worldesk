@@ -7,7 +7,7 @@ export type Profile = {
   func: string;
   markets: string[]; // country names from ONBOARD_MARKETS
   topics: string[];
-  keywords?: string[]; // free-text terms the reader tracks (companies, products, policies); max 8
+  keywords?: string[]; // free-text terms the reader tracks (companies, products, policies); max 10
   ageRange?: string; // legacy fields from the first version
   homeCountry?: string;
 };
@@ -60,15 +60,36 @@ export const INDUSTRIES = [
 
 // Suggested keywords per industry, offered as one-tap chips on the About you step.
 export const KEYWORD_SUGGESTIONS: Record<string, string[]> = {
-  Automotive: ["EV batteries", "Autonomous driving", "Chinese EV brands", "Tariffs on cars"],
-  "Financial Services": ["Interest rates", "Fintech", "Banking regulation", "Digital payments"],
-  "Healthcare & Life Sciences": ["Drug pricing", "Clinical trials", "Medical devices", "Biotech funding"],
-  "Management Consulting": ["Digital transformation", "M&A activity", "Public sector contracts", "AI adoption"],
-  Technology: ["Semiconductors", "AI regulation", "Data centers", "Cybersecurity"],
-  Energy: ["LNG", "Renewables", "Grid investment", "Carbon pricing"],
-  "Consumer Goods": ["Retail sales", "E-commerce", "Consumer confidence", "Private labels"],
+  Automotive: [
+    "EV batteries", "Chinese EV brands", "Autonomous driving", "Tariffs on cars", "Charging infrastructure",
+    "EV subsidies", "Emissions standards", "Software-defined vehicles", "Auto chip supply", "Price wars",
+  ],
+  "Financial Services": [
+    "Interest rates", "Central bank policy", "Banking regulation", "Fintech", "Digital payments",
+    "Stablecoins", "Bank M&A", "Credit risk", "Wealth management", "Anti-money laundering",
+  ],
+  "Healthcare & Life Sciences": [
+    "Drug pricing", "Clinical trials", "Drug approvals", "Medical devices", "Biotech funding",
+    "GLP-1 drugs", "Biosimilars", "Health insurance reform", "Hospital capacity", "AI in diagnostics",
+  ],
+  "Management Consulting": [
+    "Digital transformation", "AI adoption", "M&A activity", "Public sector contracts", "Cost cutting",
+    "Restructuring", "ESG reporting", "Supply chain resilience", "Labor shortages", "Private equity deals",
+  ],
+  Technology: [
+    "Semiconductors", "AI regulation", "Data centers", "Cybersecurity", "Cloud computing",
+    "Export controls", "Data privacy", "Startup funding", "5G and 6G", "Big Tech antitrust",
+  ],
+  Energy: [
+    "LNG", "Renewables", "Grid investment", "Carbon pricing", "Oil prices",
+    "Hydrogen", "Nuclear power", "Electricity prices", "Energy subsidies", "Critical minerals",
+  ],
+  "Consumer Goods": [
+    "Retail sales", "E-commerce", "Consumer confidence", "Private labels", "Food inflation",
+    "Luxury demand", "Social commerce", "Packaging rules", "Supply chain costs", "Store closures",
+  ],
 };
-export const MAX_KEYWORDS = 8;
+export const MAX_KEYWORDS = 10;
 
 export const FUNCTIONS = [
   "General Management",

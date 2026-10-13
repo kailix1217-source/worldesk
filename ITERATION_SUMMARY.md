@@ -229,3 +229,5 @@ A "Keywords to track" field on the About you step (and Settings → Edit profile
 **Prompt**:
 
 > I want to add a feature in the page where asking the job functions and industry. I want to add a keyword feature, where allows user to type keywords to personalize their search.
+>
+> Follow-up: can you have recommended ten keywords? (Each industry now suggests 10; the limit rose from 8 to 10.)
