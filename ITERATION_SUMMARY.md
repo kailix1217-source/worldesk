@@ -231,3 +231,11 @@ A "Keywords to track" field on the About you step (and Settings → Edit profile
 > I want to add a feature in the page where asking the job functions and industry. I want to add a keyword feature, where allows user to type keywords to personalize their search.
 >
 > Follow-up: can you have recommended ten keywords? (Each industry now suggests 10; the limit rose from 8 to 10.)
+
+### 26. Expand industries and deploy
+
+Industries grew from 7 to 21 plus "Other" (e.g. Aerospace & Defense, Chemicals & Materials, Industrial Manufacturing, Transportation & Logistics), each with 10 suggested keywords; the original 7 names stayed the same so saved profiles keep working. Then pushed to GitHub and redeployed worldesk.vercel.app with the keyword features.
+
+**Prompt**:
+
+> can you expand the industry options? Then you can deploy

@@ -49,13 +49,28 @@ export type Briefing = {
 export type Stage = "now" | "next" | "later" | "past";
 
 export const INDUSTRIES = [
+  "Aerospace & Defense",
+  "Agriculture & Food",
   "Automotive",
+  "Chemicals & Materials",
+  "Consumer Goods",
+  "Education",
+  "Energy",
   "Financial Services",
   "Healthcare & Life Sciences",
+  "Industrial Manufacturing",
+  "Insurance",
   "Management Consulting",
+  "Media & Entertainment",
+  "Mining & Metals",
+  "Public Sector",
+  "Real Estate & Construction",
+  "Retail & E-commerce",
   "Technology",
-  "Energy",
-  "Consumer Goods",
+  "Telecommunications",
+  "Transportation & Logistics",
+  "Travel & Hospitality",
+  "Other",
 ];
 
 // Suggested keywords per industry, offered as one-tap chips on the About you step.
@@ -87,6 +102,62 @@ export const KEYWORD_SUGGESTIONS: Record<string, string[]> = {
   "Consumer Goods": [
     "Retail sales", "E-commerce", "Consumer confidence", "Private labels", "Food inflation",
     "Luxury demand", "Social commerce", "Packaging rules", "Supply chain costs", "Store closures",
+  ],
+  "Aerospace & Defense": [
+    "Defense budgets", "Aircraft orders", "Drones", "Space launch", "Missile defense",
+    "Arms export controls", "Aerospace supply chain", "Sustainable aviation fuel", "Military procurement", "Satellite internet",
+  ],
+  "Agriculture & Food": [
+    "Crop prices", "Fertilizer prices", "Food safety rules", "Agricultural subsidies", "Weather and harvests",
+    "Food exports", "Alternative proteins", "Agritech", "Water scarcity", "Grain trade",
+  ],
+  "Chemicals & Materials": [
+    "Chemical feedstock prices", "Natural gas prices", "REACH regulation", "Plastics recycling", "Battery materials",
+    "Specialty chemicals", "PFAS rules", "Plant closures", "Carbon border tax", "Green hydrogen",
+  ],
+  Education: [
+    "Education policy", "International students", "Student visas", "EdTech", "University funding",
+    "Skills training", "AI in education", "Tuition fees", "Teacher shortages", "Online learning",
+  ],
+  "Industrial Manufacturing": [
+    "Factory output", "Automation and robotics", "Industrial policy", "Reshoring", "Steel prices",
+    "Machinery orders", "Industrial energy costs", "Skilled labor shortages", "Industrial AI", "Export orders",
+  ],
+  Insurance: [
+    "Climate risk", "Natural catastrophes", "Reinsurance rates", "Insurance regulation", "Health insurance",
+    "Cyber insurance", "Life insurance demand", "Motor insurance", "Insurtech", "Solvency rules",
+  ],
+  "Media & Entertainment": [
+    "Streaming", "Advertising market", "Box office", "Gaming", "Content regulation",
+    "AI and copyright", "Social media platforms", "Sports rights", "Music industry", "Influencer marketing",
+  ],
+  "Mining & Metals": [
+    "Critical minerals", "Lithium", "Copper prices", "Iron ore", "Rare earths",
+    "Mining permits", "Gold prices", "Smelting", "Resource nationalism", "Mine safety",
+  ],
+  "Public Sector": [
+    "Government budget", "Public procurement", "Elections", "Infrastructure spending", "Digital government",
+    "Tax policy", "Public sector pay", "Regulatory reform", "Defense spending", "Healthcare spending",
+  ],
+  "Real Estate & Construction": [
+    "Housing prices", "Mortgage rates", "Commercial property", "Construction costs", "Building permits",
+    "Office vacancy", "Infrastructure projects", "Property developers", "Green buildings", "Rental market",
+  ],
+  "Retail & E-commerce": [
+    "Retail sales", "E-commerce platforms", "Cross-border e-commerce", "Store closures", "Consumer spending",
+    "Discount retailers", "Social commerce", "Last-mile delivery", "Retail media", "Payment methods",
+  ],
+  Telecommunications: [
+    "5G rollout", "Spectrum auctions", "Telecom mergers", "Fiber broadband", "Satellite internet",
+    "Network security", "Data center demand", "Mobile pricing", "Telecom regulation", "Undersea cables",
+  ],
+  "Transportation & Logistics": [
+    "Freight rates", "Shipping routes", "Port congestion", "Air cargo", "Rail freight",
+    "Trucking", "Warehouse demand", "Fuel costs", "Customs rules", "Supply chain disruption",
+  ],
+  "Travel & Hospitality": [
+    "Tourism arrivals", "Hotel occupancy", "Airline capacity", "Visa rules", "Business travel",
+    "Airfares", "Short-term rentals", "Cruise industry", "Travel restrictions", "Events and conferences",
   ],
 };
 export const MAX_KEYWORDS = 10;

@@ -66,7 +66,8 @@ Write every search query in ${market.language}, the way a local reader would, an
 Draw on as many of the listed outlets as possible: include at least one story from each outlet that has relevant coverage, rather than taking everything from one.
 At least half of the stories must be directly about the reader's industry; the rest may be the local economy or policy that affects it. If you do not have the exact original headline, return an empty string for original_headline rather than a placeholder. Skip opinion pieces, horoscopes, sports and celebrity news.`;
 
-  const employer = profile.company?.trim() ? `${profile.company.trim()}, a ${profile.industry} company` : `a ${profile.industry} company`;
+  const kind = profile.industry && profile.industry !== "Other" ? `a ${profile.industry} company` : "a company";
+  const employer = profile.company?.trim() ? `${profile.company.trim()}, ${kind}` : kind;
   // Markets replaced trip stops in onboarding; older saved trips still carry dates.
   const where = leg.arrive
     ? `Trip: ${leg.city}, ${leg.country}, ${leg.arrive} to ${leg.depart}.`
