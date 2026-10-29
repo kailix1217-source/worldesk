@@ -29,7 +29,7 @@ export async function GET(req: Request) {
     : await sql`SELECT * FROM survey_responses WHERE env = 'production' ORDER BY id`) as Row[];
 
   const header = [
-    "ID", "Completion time", "Channel",
+    "ID", "Completion time", "Last modified time", "Channel",
     ...RATING_ROWS.map((r) => `${QUESTIONS.ratings}.${r.label}`),
     QUESTIONS.ranking, QUESTIONS.frequency, QUESTIONS.pay, QUESTIONS.idea, QUESTIONS.email,
     "Seconds to complete", "Device", "Sample account", "Environment", "Role", "Industry", "Markets",
@@ -39,7 +39,7 @@ export async function GET(req: Request) {
       .sort((a, b) => Number(r[`rank_${a.key}`]) - Number(r[`rank_${b.key}`]))
       .map((f) => f.label + ";").join("");
     return [
-      r.id, new Date(r.created_at).toISOString(), r.channel,
+      r.id, new Date(r.created_at).toISOString(), r.updated_at ? new Date(String(r.updated_at)).toISOString() : "", r.channel,
       ...RATING_ROWS.map((x) => r[`r_${x.key}`]),
       ranking, r.frequency, r.willingness_to_pay, r.idea, r.email,
       r.seconds_to_complete, r.device, r.demo ? "Yes" : "No", r.env, r.func, r.industry, (r.markets ?? []).join("; "),

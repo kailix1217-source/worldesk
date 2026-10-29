@@ -647,8 +647,7 @@ article.story[data-url] { padding: 24px 26px; margin-top: 18px; }
 /* ---------- v30: in-app feedback survey (invitation, drawer, resume pill) ---------- */
 .sb-fb { display: flex; flex-direction: column; line-height: 1.25; }
 .sb-fb small { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.04em; color: var(--muted); }
-.sb-feedback.sent { color: var(--muted); cursor: default; }
-.sb-feedback.sent:hover { background: none; }
+.sb-feedback.sent { color: var(--muted); }
 .sv-kicker { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--signal-text); }
 .sv-invite { position: fixed; right: 24px; bottom: 24px; z-index: 40; width: 340px; background: var(--paper-card); border: 1px solid var(--card-line);
   border-radius: 24px; padding: 20px 22px; box-shadow: 0 30px 70px -30px rgba(20, 30, 50, 0.45); animation: sv-rise 0.35s ease-out; }
@@ -707,6 +706,7 @@ article.story[data-url] { padding: 24px 26px; margin-top: 18px; }
 .sv-error { color: var(--danger); font-size: 13.5px; margin: 10px 0 0; }
 .sv-foot { display: flex; justify-content: space-between; gap: 12px; padding: 14px 24px 22px; border-top: 1px solid var(--card-line); }
 .sv-foot .btn { padding: 11px 24px; }
+.sv-foot .sv-row .btn { padding: 11px 18px; }
 .sv-thanks { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 14px; }
 .sv-thanks h3 { font-size: 21px; max-width: 280px; }
 .sv-check { width: 56px; height: 56px; border-radius: 50%; background: var(--signal); color: #fff; display: grid; place-items: center; font-size: 26px; font-weight: 700; }

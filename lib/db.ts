@@ -26,6 +26,11 @@ export function ensureSchema() {
       profile_shared BOOLEAN NOT NULL DEFAULT false, func TEXT, industry TEXT, markets TEXT[],
       ip_hash TEXT
     )`;
+    // Readers can edit their answers later from the same browser; the row keeps a hash of their edit token.
+    await sql`ALTER TABLE survey_responses
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS edit_count INT NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS edit_hash TEXT`;
     await sql`CREATE TABLE IF NOT EXISTS survey_events (
       id SERIAL PRIMARY KEY,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -37,6 +42,8 @@ export function ensureSchema() {
   })().catch((e) => { ready = null; throw e; });
   return ready;
 }
+
+export const tokenHash = (token: string) => createHash("sha256").update(token).digest("hex");
 
 // Rate limiting needs to recognise a repeat sender without storing their IP address.
 export function ipHash(req: Request) {

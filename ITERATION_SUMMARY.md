@@ -250,3 +250,11 @@ The class feedback survey now lives inside Worldesk. After a reader has opened 3
 >
 > Follow-up: no × on the card; remove "leave your email and we will tell you when it ships"; wording "less than 2 min"; drop the custom keywords option; required questions match exactly; any easy database; later we need to visualize the responses.
 
+### 28. Editing survey answers
+
+Readers can now change their survey answers after submitting. The sidebar shows "Feedback sent ✓ · edit answers"; it reopens the survey with their saved answers, and "Save changes" updates the same response instead of adding a new one. The CSV export shows when each response was last modified.
+
+**Prompt**:
+
+> I think there is a edge case that what if the user may want to edit their survey response? now once they submit they won't able to reopen it
+

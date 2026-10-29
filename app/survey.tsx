@@ -7,8 +7,13 @@ import {
   stepComplete, validEmail, type FeatureKey, type SurveyAnswers,
 } from "@/lib/survey";
 
-type Meta = { status: "new" | "done"; invites: number; snoozeUntil?: number; sid?: string };
-type Draft = { step: number; answers: SurveyAnswers; startedAt: number };
+// After submitting, the browser keeps the response id, its edit token and a copy of the answers,
+// so the reader can reopen and change them later from the sidebar.
+type Meta = {
+  status: "new" | "done"; invites: number; snoozeUntil?: number; sid?: string;
+  responseId?: number; editToken?: string; submitted?: SurveyAnswers;
+};
+type Draft = { step: number; answers: SurveyAnswers; startedAt: number; edit?: boolean };
 type Ui = "hidden" | "invite" | "panel" | "pill" | "thanks";
 
 const META = "wd.survey", DRAFT = "wd.survey.draft";
@@ -68,6 +73,8 @@ export function Survey({ profile, demo, opens, openReq, onDone }: {
     setMeta(m);
     const d = load<Draft | null>(DRAFT, null);
     if (d && m.status !== "done") { setDraft(d); setUi("pill"); }
+    else if (d) save(DRAFT, null); // an unsaved edit is dropped on reload
+
     setLoaded(true);
   }, []);
 
@@ -91,9 +98,11 @@ export function Survey({ profile, demo, opens, openReq, onDone }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, ui, meta, opens]);
 
-  // Sidebar "Give feedback" opens the panel directly.
+  // Sidebar "Give feedback" opens the panel directly; after submitting, it reopens the answers for editing.
   useEffect(() => {
-    if (openReq > 0 && meta.status !== "done") start();
+    if (openReq <= 0) return;
+    if (meta.status !== "done") start();
+    else if (meta.editToken && meta.submitted) startEdit();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openReq]);
 
@@ -107,13 +116,19 @@ export function Survey({ profile, demo, opens, openReq, onDone }: {
     if (!draft.startedAt) { updateDraft((d) => ({ ...d, startedAt: d.startedAt || Date.now() })); track("started"); }
     setUi("panel");
   };
+  const startEdit = () => {
+    if (!draft.edit) updateDraft(() => ({ step: 0, answers: meta.submitted!, startedAt: Date.now(), edit: true }));
+    setError("");
+    setUi("panel");
+  };
+  const closeEdit = () => { save(DRAFT, null); setDraft({ step: 0, answers: EMPTY_ANSWERS, startedAt: 0 }); setUi("hidden"); };
   const later = () => { updateMeta({ ...meta, snoozeUntil: Date.now() + SNOOZE_MS }); setUi("hidden"); track("later"); };
   const minimize = () => { setUi("pill"); track("minimized", draft.step); };
   const setAnswers = (f: (a: SurveyAnswers) => Partial<SurveyAnswers>) =>
     updateDraft((d) => ({ ...d, answers: { ...d.answers, ...f(d.answers) } }));
   const goStep = (step: number) => {
     updateDraft((d) => ({ ...d, step }));
-    if (step > draft.step) track("step", step);
+    if (step > draft.step && !draft.edit) track("step", step);
     setError("");
   };
   // Single-choice questions move on by themselves after a short beat.
@@ -122,20 +137,22 @@ export function Survey({ profile, demo, opens, openReq, onDone }: {
     setAnswers(() => patch);
     setTimeout(() => {
       updateDraft((d) => (d.step === from ? { ...d, step: from + 1 } : d)); // unless the reader already moved
-      track("step", from + 1);
+      if (!draft.edit) track("step", from + 1);
     }, 260);
   };
 
   const submit = async () => {
     const a = draft.answers;
     if (!validEmail(a.email)) { setError("That email address doesn't look right."); return; }
+    const edit = !!draft.edit;
     setSending(true);
     setError("");
     try {
       const res = await fetch("/api/survey", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: edit ? "PUT" : "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...a, session: sid(), website: trap, demo,
+          ...(edit ? { id: meta.responseId, token: meta.editToken } : {}),
           seconds: draft.startedAt ? (Date.now() - draft.startedAt) / 1000 : 0,
           device: window.innerWidth < 900 ? "mobile" : "desktop",
           profile: a.shareProfile && !demo ? { func: profile.func, industry: profile.industry, markets: profile.markets } : undefined,
@@ -144,11 +161,14 @@ export function Survey({ profile, demo, opens, openReq, onDone }: {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || "We couldn't send your answers. Please try again.");
-      updateMeta({ ...meta, status: "done" });
+      updateMeta({
+        ...meta, status: "done", submitted: a,
+        ...(json.id && !edit ? { responseId: json.id, editToken: json.token } : {}),
+      });
       save(DRAFT, null);
       setUi("thanks");
       onDone();
-      setTimeout(() => setUi("hidden"), 4000);
+      setTimeout(() => { setUi("hidden"); setDraft({ step: 0, answers: EMPTY_ANSWERS, startedAt: 0 }); }, 4000);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -181,26 +201,32 @@ export function Survey({ profile, demo, opens, openReq, onDone }: {
     );
   }
 
-  const { step, answers: a } = draft;
+  const { step, answers: a, edit } = draft;
   return (
     <aside className="sv-panel" role="dialog" aria-label="Worldesk feedback survey">
       <header className="sv-head">
         <div>
-          <span className="sv-kicker">Help shape Worldesk</span>
+          <span className="sv-kicker">{edit ? "Edit your feedback" : "Help shape Worldesk"}</span>
           {ui === "panel" && <div className="sv-meta">Step {step + 1} of {STEPS} · {timeLeft(step)}</div>}
         </div>
-        {ui === "panel" && (
+        {ui === "panel" && (edit ? (
+          // Editing can't lose anything: the saved answers stay as they were.
+          <button className="sv-min" onClick={closeEdit} aria-label="Close without saving" title="Close without saving">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        ) : (
           <button className="sv-min" onClick={minimize} aria-label="Minimize survey" title="Minimize">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
           </button>
-        )}
+        ))}
       </header>
       {ui === "panel" && <div className="sv-bar" aria-hidden="true"><i style={{ width: `${((step + 1) / STEPS) * 100}%` }} /></div>}
 
       {ui === "thanks" ? (
         <div className="sv-body sv-thanks" role="status">
           <div className="sv-check" aria-hidden="true">✓</div>
-          <h3>Thanks — you&apos;re shaping what we build next.</h3>
+          <h3>{edit ? "Your changes are saved." : <>Thanks — you&apos;re shaping what we build next.</>}</h3>
+          {!edit && meta.editToken && <p className="sv-hint">Changed your mind? You can edit your answers from the sidebar.</p>}
         </div>
       ) : (
         <>
@@ -300,7 +326,13 @@ export function Survey({ profile, demo, opens, openReq, onDone }: {
 
           <footer className="sv-foot">
             {step > 0 ? <button className="btn ghost" onClick={() => goStep(step - 1)}>Back</button> : <span />}
-            {step < STEPS - 1
+            {edit ? (
+              // Every answer is already complete, so changes can be saved from any step.
+              <div className="sv-row">
+                {step < STEPS - 1 && <button className="btn ghost" disabled={!stepComplete(step, a)} onClick={() => goStep(step + 1)}>Next</button>}
+                <button className="btn" disabled={sending || ![0, 1, 2, 3, 4].every((n) => stepComplete(n, a))} onClick={submit}>{sending ? "Saving…" : "Save changes"}</button>
+              </div>
+            ) : step < STEPS - 1
               ? <button className="btn" disabled={!stepComplete(step, a)} onClick={() => goStep(step + 1)}>Next</button>
               : <button className="btn" disabled={sending || !stepComplete(step, a)} onClick={submit}>{sending ? "Sending…" : "Submit"}</button>}
           </footer>

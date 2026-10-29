@@ -1131,9 +1131,11 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
           })}
         </nav>
         <div className="sb-foot">
-          <button className={`sb-item sb-feedback ${surveyDone ? "sent" : ""}`} disabled={surveyDone} onClick={() => setSurveyReq((n) => n + 1)}>
+          <button className={`sb-item sb-feedback ${surveyDone ? "sent" : ""}`} onClick={() => setSurveyReq((n) => n + 1)}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12z" /></svg>
-            {surveyDone ? "Feedback sent ✓" : <span className="sb-fb">Give feedback<small>less than 2 min</small></span>}
+            {surveyDone
+              ? <span className="sb-fb">Feedback sent ✓<small>edit answers</small></span>
+              : <span className="sb-fb">Give feedback<small>less than 2 min</small></span>}
           </button>
           <button className={`sb-item ${view === "saved" ? "on" : ""}`} onClick={() => go("saved")}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z" /></svg>Saved stories
