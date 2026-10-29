@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ONBOARD_MARKETS, marketFor } from "@/lib/sources";
 import { DOTS, PINS, WORLD } from "@/lib/worldDots";
+import { Survey, useSurveyDone } from "./survey";
 import {
   FUNCTIONS, INDUSTRIES, KEYWORD_SUGGESTIONS, MAX_KEYWORDS, TOPICS,
   type Article, type Briefing, type Leg, type Profile,
@@ -586,8 +587,8 @@ function relDate(d: string) {
 const sourcesOf = (a: Article) => (a.sources?.length ? a.sources : [{ outlet: a.outlet, url: a.url }]);
 
 // Only a view's lead story carries a picture; every other story is a compact text card.
-function StoryCard({ a, lead, isNew, saved, onSave, onTag }: {
-  a: Article; lead: boolean; isNew: boolean; saved: boolean; onSave: () => void; onTag: (t: string) => void;
+function StoryCard({ a, lead, isNew, saved, onSave, onTag, onOpen }: {
+  a: Article; lead: boolean; isNew: boolean; saved: boolean; onSave: () => void; onTag: (t: string) => void; onOpen: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [imgOk, setImgOk] = useState(true);
@@ -624,7 +625,7 @@ function StoryCard({ a, lead, isNew, saved, onSave, onTag }: {
         {srcs.map((s) => (
           <a key={s.url} className="sc-link" href={s.url} target="_blank" rel="noopener noreferrer">View {s.outlet} ↗</a>
         ))}
-        <button className={`sc-toggle ${open ? "open" : ""}`} onClick={() => setOpen((v) => !v)} aria-expanded={open}
+        <button className={`sc-toggle ${open ? "open" : ""}`} onClick={() => { if (!open) onOpen(); setOpen((v) => !v); }} aria-expanded={open}
           aria-label={open ? "Hide summary" : "Show summary"} title={open ? "Less" : "Read summary"}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
         </button>
@@ -729,6 +730,10 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
   const [alerts, setAlerts] = useState<Alerts>(() => ({ ...ALERT_DEFAULT, ...load<Partial<Alerts>>("wd.alerts", {}) }));
   const [alertMsg, setAlertMsg] = useState("");
   const [saved, setSaved] = useState<Article[]>(() => load<Article[]>("wd.saved", []));
+  // Feedback survey: stories opened this visit (an invitation trigger) and sidebar requests to open it.
+  const [opens, setOpens] = useState(0);
+  const [surveyReq, setSurveyReq] = useState(0);
+  const [surveyDone, setSurveyDone] = useSurveyDone();
   // Size of each candidate picture, measured in the browser (0 = failed to load or blocked).
   const [imgSize, setImgSize] = useState<Record<string, { w: number; h: number }>>({});
   const feedsRef = useRef(feeds);
@@ -913,7 +918,7 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
     const ordered = lead ? [lead, ...list.filter((a) => a !== lead)] : list;
     return ordered.map((a) => (
       <StoryCard key={a.url} a={a === lead ? { ...a, image: leadImage(a) } : a} lead={a === lead} isNew={isNew(a.url)} saved={isSaved(a.url)} onSave={() => toggleSave(a)}
-        onTag={(t) => { if (topicList.includes(t)) setFilter(t); }} />
+        onTag={(t) => { if (topicList.includes(t)) setFilter(t); }} onOpen={() => setOpens((n) => n + 1)} />
     ));
   };
   const Chips = ({ onPick, counts }: { onPick: (t: string) => void; counts: (t: string) => number }) => (
@@ -1126,6 +1131,10 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
           })}
         </nav>
         <div className="sb-foot">
+          <button className={`sb-item sb-feedback ${surveyDone ? "sent" : ""}`} disabled={surveyDone} onClick={() => setSurveyReq((n) => n + 1)}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12z" /></svg>
+            {surveyDone ? "Feedback sent ✓" : <span className="sb-fb">Give feedback<small>less than 2 min</small></span>}
+          </button>
           <button className={`sb-item ${view === "saved" ? "on" : ""}`} onClick={() => go("saved")}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z" /></svg>Saved stories
             {saved.length > 0 && <span className="sb-n">{saved.length}</span>}
@@ -1147,6 +1156,7 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
           </footer>
         </div>
       </main>
+      <Survey profile={profile} demo={demo} opens={opens} openReq={surveyReq} onDone={() => setSurveyDone(true)} />
     </div>
   );
 }

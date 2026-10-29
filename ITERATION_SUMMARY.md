@@ -239,3 +239,14 @@ Industries grew from 7 to 21 plus "Other" (e.g. Aerospace & Defense, Chemicals &
 **Prompt**:
 
 > can you expand the industry options? Then you can deploy
+
+### 27. In-app feedback survey
+
+The class feedback survey now lives inside Worldesk. After a reader has opened 3 stories (or spent 3 minutes), a small card invites them: "Help shape Worldesk · 5 quick questions · less than 2 min", with Start or Later. The survey opens in a side drawer (a bottom sheet on phones), one question per step with a progress bar and time left, while the briefing stays usable; it can be minimized and resumed. Required questions match the Microsoft Form. Answers go to a Neon Postgres database (one row per response, ready for charts), with funnel events (invited, started, step reached) and a password-protected CSV export that lines up with the Microsoft Forms export.
+
+**Prompt**:
+
+> You are a UI/UX designer. I am the PM and want to embed this survey questions in Worldesk website. I don't want user click a button, then pops up to Microsoft form. I want user to complete the survey within the website, and they can continue browsing and using the product after finish the survey. I also want to let user know the survey takes less than 2 minutes to complete. I also want to encourage the user to fill the survey. Please design a plan and proposal of changes to the website, including what would change in the backend and frontend.
+>
+> Follow-up: no × on the card; remove "leave your email and we will tell you when it ships"; wording "less than 2 min"; drop the custom keywords option; required questions match exactly; any easy database; later we need to visualize the responses.
+
