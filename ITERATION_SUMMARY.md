@@ -300,7 +300,7 @@ Worldesk accounts now use Google sign-in. Step 1 of onboarding is "Continue with
 
 ### 33. Privacy page and Mexico
 
-Added a privacy page, linked from the first page, the sign-in step and the briefing footer, describing what is collected, who handles it and how to request deletion by email. Replaced the UAE with Mexico in the market picker; saved profiles that already follow the UAE keep working. Then pushed to GitHub.
+Added a privacy page, linked from the first page, the sign-in step and the briefing footer, describing what is collected, who handles it and how to request deletion by email. Replaced the UAE with Mexico in the market picker; saved profiles that already follow the UAE keep working. Then pushed to GitHub, redeployed worldesk.vercel.app, and published the Google sign-in app.
 
 **Prompt**:
 
