@@ -342,3 +342,13 @@ On desktop, the briefing is now centered on the whole window rather than the spa
 
 > it should be center of the website page. so slightly to the left
 
+### 37. User ID on survey counts
+
+Survey invite, start and step counts now record the signed-in reader's user ID, taken from the session, so survey completion can be measured per reader. The sample account and signed-out visitors stay anonymous, and the privacy page says so. Then pushed to GitHub and redeployed worldesk.vercel.app.
+
+**Prompt**:
+
+> not yet. but to make sure, all the metrics are stored?
+>
+> yes. (add the user ID to the survey invite counts, then deploy)
+

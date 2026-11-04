@@ -48,7 +48,7 @@ export default function PrivacyPage() {
         <li>Your answers, and your comments or email address if you choose to add them.</li>
         <li>Your role, industry and markets, only if you tick the box to include them.</li>
         <li>How long the survey took, your device type (desktop or mobile), and a scrambled version of your network address used to limit repeat submissions.</li>
-        <li>Which survey steps were reached, recorded with a random ID rather than your name.</li>
+        <li>Whether you were invited to the survey, started it, and which steps you reached, recorded with your account ID, or a random ID on the sample.</li>
       </ul>
       <p>
         <strong>Your survey answers are linked to your account</strong>, so that you have one response and can edit it

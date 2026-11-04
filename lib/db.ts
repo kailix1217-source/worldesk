@@ -39,6 +39,7 @@ export function ensureSchema() {
       type TEXT NOT NULL,
       step SMALLINT
     )`;
+    await sql`ALTER TABLE survey_events ADD COLUMN IF NOT EXISTS user_id TEXT`;
     // One row per Worldesk account, created on first sign-in. user_id is the Neon Auth user id.
     await sql`CREATE TABLE IF NOT EXISTS user_data (
       user_id TEXT PRIMARY KEY,

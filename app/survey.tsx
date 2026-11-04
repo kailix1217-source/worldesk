@@ -61,7 +61,7 @@ export function Survey({ profile, demo, storiesReady, openReq, onDone }: {
   const track = (type: string, step?: number) => {
     fetch("/api/survey/event", {
       method: "POST", headers: { "Content-Type": "application/json" }, keepalive: true,
-      body: JSON.stringify({ type, step, session: sid() }),
+      body: JSON.stringify({ type, step, session: sid(), demo }),
     }).catch(() => {});
   };
   const META = metaKey(demo), DRAFT = draftKey(demo);
