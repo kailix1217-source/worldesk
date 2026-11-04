@@ -334,3 +334,11 @@ The survey invitation now appears after 15 seconds with stories on screen, repla
 >
 > deploy. yes I signed in with my another google account. for the survey I think, for each new user, pop up after they stay at. the briefing page for 15 seconds. and for computer page, can you move this towards the right so it stays more on the center
 
+### 36. Briefing centered on the window
+
+On desktop, the briefing is now centered on the whole window rather than the space beside the sidebar, and on narrower windows it sits as close to center as the sidebar allows. Then pushed to GitHub and redeployed worldesk.vercel.app.
+
+**Prompt**:
+
+> it should be center of the website page. so slightly to the left
+

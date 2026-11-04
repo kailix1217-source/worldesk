@@ -744,3 +744,8 @@ article.story[data-url] { padding: 24px 26px; margin-top: 18px; }
 .sc-toggle:focus-visible { outline-offset: -2px; }
 .sc-date { margin-right: auto; }
 .sc-links { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* v39: center the briefing on the whole window, not the space beside the 264px sidebar. On narrower windows it sits as close to center as the sidebar allows. */
+@media (min-width: 901px) {
+  .bf-col { margin-inline: max(0px, calc(50vw - 400px - 264px - clamp(20px, 4vw, 56px))) auto; }
+}
