@@ -10,6 +10,19 @@ export const maxDuration = 120;
 const DAILY_LIMIT = 300;
 const MAX_COUNT = 10;
 
+// Perplexity rejects searches over its per-second limit (429) and says when to try again.
+// The random extra wait stops simultaneous searches from all retrying at the same moment.
+const MAX_RETRIES = 5;
+async function fetchWithRetry(url: string, init: RequestInit) {
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url, init);
+    if (res.status !== 429 || attempt === MAX_RETRIES) return res;
+    const wait = Math.min(Number(res.headers.get("retry-after")) || 1, 10);
+    console.warn(`Perplexity 429, retry ${attempt + 1} of ${MAX_RETRIES} in ${wait}s`);
+    await new Promise((r) => setTimeout(r, wait * 1000 + Math.random() * 1000 * (attempt + 1)));
+  }
+}
+
 const SCHEMA = {
   type: "object",
   properties: {
@@ -101,7 +114,7 @@ also_reported_by: if another of the listed outlets also reported the same story,
 landing_note: one sentence on the overall business mood in ${leg.arrive ? leg.city : leg.country} this week, based only on these stories.`;
 
   // Perplexity Agent API: https://docs.perplexity.ai/api-reference/agent-post
-  const res = await fetch("https://api.perplexity.ai/v1/agent", {
+  const res = await fetchWithRetry("https://api.perplexity.ai/v1/agent", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${process.env.PERPLEXITY_API_KEY}`,

@@ -276,3 +276,11 @@ When the news search fails, readers now see a plain sentence and a "Try again" l
 >
 > yes make both fixes, keep the invite, then deploy.
 
+### 31. Retry when the news search is rate limited
+
+Perplexity limits how many searches can start each second, so briefings that ran several searches at once could lose some of them. The server now waits and retries up to 5 times before showing an error. Then pushed to GitHub.
+
+**Prompt**:
+
+> yes. (approving the retry fix, then Google-only accounts)
+
