@@ -21,7 +21,7 @@ const metaKey = (demo: boolean) => (demo ? "wd.survey.sample" : "wd.survey");
 const draftKey = (demo: boolean) => `${metaKey(demo)}.draft`;
 const MAX_INVITES = 2;
 const SNOOZE_MS = 24 * 3600_000;
-const INVITE_AFTER_OPENS = 3, INVITE_AFTER_MS = 30_000;
+const INVITE_AFTER_MS = 15_000;
 const STEPS = 5;
 // Rough seconds each step takes, for the "time left" line under the progress bar.
 const STEP_SECONDS = [30, 35, 8, 8, 20];
@@ -45,8 +45,8 @@ export function useSurveyDone(demo: boolean) {
 }
 
 // Invitation card, survey panel and minimized pill. The briefing stays usable the whole time.
-export function Survey({ profile, demo, opens, openReq, onDone }: {
-  profile: Profile; demo: boolean; opens: number; openReq: number; onDone: () => void;
+export function Survey({ profile, demo, storiesReady, openReq, onDone }: {
+  profile: Profile; demo: boolean; storiesReady: boolean; openReq: number; onDone: () => void;
 }) {
   const [ui, setUi] = useState<Ui>("hidden");
   const [meta, setMeta] = useState<Meta>({ status: "new", invites: 0 });
@@ -87,20 +87,22 @@ export function Survey({ profile, demo, opens, openReq, onDone }: {
     } else setLoaded(true);
   }, []);
 
-  // Browsing time only runs while the page is on screen, so a tab left in the background doesn't count.
+  // The clock runs only while stories are showing and the page is on screen. First searches can take up to a
+  // minute, and readers can't rate a briefing they haven't seen; a tab left in the background doesn't count either.
   useEffect(() => {
+    if (!storiesReady) return;
     const t = setInterval(() => { if (document.visibilityState === "visible") browsedMs.current += 1000; }, 1000);
     return () => clearInterval(t);
-  }, []);
+  }, [storiesReady]);
 
-  // Invite once the reader has seen value: 3 stories opened or 30 seconds browsing the briefing,
+  // Invite after 15 seconds with stories on screen,
   // never while a story is expanded, once per session, at most twice in total.
   useEffect(() => {
     const check = () => {
       if (!loaded || ui !== "hidden" || meta.status === "done" || meta.invites >= MAX_INVITES) return;
       if (meta.snoozeUntil && Date.now() < meta.snoozeUntil) return;
       try { if (sessionStorage.getItem("wd.survey.asked")) return; } catch { /* ignore */ }
-      if (opens < INVITE_AFTER_OPENS && browsedMs.current < INVITE_AFTER_MS) return;
+      if (browsedMs.current < INVITE_AFTER_MS) return;
       if (document.querySelector(".sc-toggle.open")) return;
       try { sessionStorage.setItem("wd.survey.asked", "1"); } catch { /* ignore */ }
       updateMeta({ ...meta, invites: meta.invites + 1 });
@@ -108,10 +110,10 @@ export function Survey({ profile, demo, opens, openReq, onDone }: {
       track("invite_shown");
     };
     check();
-    const t = setInterval(check, 5000);
+    const t = setInterval(check, 1000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, ui, meta, opens]);
+  }, [loaded, ui, meta]);
 
   // Sidebar "Give feedback" opens the panel directly; after submitting, it reopens the answers for editing.
   useEffect(() => {

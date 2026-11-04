@@ -324,3 +324,13 @@ Headline changed to "Know your markets like a local." because the audience is no
 >
 > go with white and ready to deploy
 
+### 35. Earlier survey invitation and a centered page
+
+The survey invitation now appears after 15 seconds with stories on screen, replacing the 30-second and 3-opened-stories rules, and the check runs every second. The clock waits for stories because a first search can take up to a minute and readers cannot rate a briefing they have not seen. On desktop, the briefing column is now centered in the space beside the sidebar. Removed a leftover black line that appeared when hovering over "Read summary". Then pushed to GitHub and redeployed worldesk.vercel.app.
+
+**Prompt**:
+
+> When my mouse hovers over Re-Summary, it is initially white, and when I hover, it becomes gray. That looks fine, but on the top of the gray bar, there is a darker line on top. I want that one to be removed.
+>
+> deploy. yes I signed in with my another google account. for the survey I think, for each new user, pop up after they stay at. the briefing page for 15 seconds. and for computer page, can you move this towards the right so it stays more on the center
+

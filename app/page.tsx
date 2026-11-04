@@ -630,8 +630,8 @@ function relDate(d: string) {
 const sourcesOf = (a: Article) => (a.sources?.length ? a.sources : [{ outlet: a.outlet, url: a.url }]);
 
 // Only a view's lead story carries a picture; every other story is a compact text card.
-function StoryCard({ a, lead, isNew, saved, onSave, onTag, onOpen }: {
-  a: Article; lead: boolean; isNew: boolean; saved: boolean; onSave: () => void; onTag: (t: string) => void; onOpen: () => void;
+function StoryCard({ a, lead, isNew, saved, onSave, onTag }: {
+  a: Article; lead: boolean; isNew: boolean; saved: boolean; onSave: () => void; onTag: (t: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [imgOk, setImgOk] = useState(true);
@@ -640,7 +640,7 @@ function StoryCard({ a, lead, isNew, saved, onSave, onTag, onOpen }: {
   const lang = marketFor(country)?.language;
   const showImage = lead && !!a.image && imgOk;
   const toggle = (via: "button" | "headline") => {
-    if (!open) { onOpen(); track("story_open", { market: country, topic: a.category, outlet: a.outlet, via }); }
+    if (!open) { track("story_open", { market: country, topic: a.category, outlet: a.outlet, via }); }
     setOpen((v) => !v);
   };
   return (
@@ -787,7 +787,6 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
   const [alertMsg, setAlertMsg] = useState("");
   const [saved, setSaved] = useState<Article[]>(() => load<Article[]>("wd.saved", []));
   // Feedback survey: stories opened this visit (an invitation trigger) and sidebar requests to open it.
-  const [opens, setOpens] = useState(0);
   // Usage clock for the briefing: opened, how long stories took to appear, then time actually spent reading.
   const mountedAt = useRef(Date.now());
   const opened = useRef(false);
@@ -988,7 +987,7 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
     const ordered = lead ? [lead, ...list.filter((a) => a !== lead)] : list;
     return ordered.map((a) => (
       <StoryCard key={a.url} a={a === lead ? { ...a, image: leadImage(a) } : a} lead={a === lead} isNew={isNew(a.url)} saved={isSaved(a.url)} onSave={() => toggleSave(a)}
-        onTag={(t) => { if (topicList.includes(t)) { track("topic_filter", { topic: t }); setFilter(t); } }} onOpen={() => setOpens((n) => n + 1)} />
+        onTag={(t) => { if (topicList.includes(t)) { track("topic_filter", { topic: t }); setFilter(t); } }} />
     ));
   };
   const Chips = ({ onPick, counts }: { onPick: (t: string) => void; counts: (t: string) => number }) => (
@@ -1232,7 +1231,7 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
           </footer>
         </div>
       </main>
-      <Survey profile={profile} demo={demo} opens={opens} openReq={surveyReq} onDone={() => setSurveyDone(true)} />
+      <Survey profile={profile} demo={demo} storiesReady={Object.values(feeds).some((f) => f.articles.length > 0)} openReq={surveyReq} onDone={() => setSurveyDone(true)} />
     </div>
   );
 }
