@@ -19,7 +19,7 @@ type Ui = "hidden" | "invite" | "panel" | "pill" | "thanks";
 const META = "wd.survey", DRAFT = "wd.survey.draft";
 const MAX_INVITES = 2;
 const SNOOZE_MS = 24 * 3600_000;
-const INVITE_AFTER_OPENS = 3, INVITE_AFTER_MS = 3 * 60_000;
+const INVITE_AFTER_OPENS = 3, INVITE_AFTER_MS = 30_000;
 const STEPS = 5;
 // Rough seconds each step takes, for the "time left" line under the progress bar.
 const STEP_SECONDS = [30, 35, 8, 8, 20];
@@ -52,7 +52,7 @@ export function Survey({ profile, demo, opens, openReq, onDone }: {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [trap, setTrap] = useState("");
-  const mountedAt = useRef(Date.now());
+  const browsedMs = useRef(0);
   const [loaded, setLoaded] = useState(false);
 
   const sid = () => meta.sid ?? "";
@@ -78,14 +78,20 @@ export function Survey({ profile, demo, opens, openReq, onDone }: {
     setLoaded(true);
   }, []);
 
-  // Invite once the reader has seen value: 3 stories opened or 3 minutes on the briefing,
+  // Browsing time only runs while the page is on screen, so a tab left in the background doesn't count.
+  useEffect(() => {
+    const t = setInterval(() => { if (document.visibilityState === "visible") browsedMs.current += 1000; }, 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Invite once the reader has seen value: 3 stories opened or 30 seconds browsing the briefing,
   // never while a story is expanded, once per session, at most twice in total.
   useEffect(() => {
     const check = () => {
       if (!loaded || ui !== "hidden" || meta.status === "done" || meta.invites >= MAX_INVITES) return;
       if (meta.snoozeUntil && Date.now() < meta.snoozeUntil) return;
       try { if (sessionStorage.getItem("wd.survey.asked")) return; } catch { /* ignore */ }
-      if (opens < INVITE_AFTER_OPENS && Date.now() - mountedAt.current < INVITE_AFTER_MS) return;
+      if (opens < INVITE_AFTER_OPENS && browsedMs.current < INVITE_AFTER_MS) return;
       if (document.querySelector(".sc-toggle.open")) return;
       try { sessionStorage.setItem("wd.survey.asked", "1"); } catch { /* ignore */ }
       updateMeta({ ...meta, invites: meta.invites + 1 });
