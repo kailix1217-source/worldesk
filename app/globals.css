@@ -536,6 +536,7 @@ article.story[data-url] { padding: 24px 26px; margin-top: 18px; }
 .summary-rows button { background: none; border: 1px solid rgba(255, 255, 255, 0.25); color: #fff; border-radius: 999px; font-family: var(--mono); font-size: 10.5px;
   letter-spacing: 0.1em; padding: 3px 0; }
 .summary-rows button:hover { border-color: #ff8a5c; color: #ff8a5c; }
+.summary-rows button.summary-retry { border: 0; border-radius: 0; padding: 0; min-width: 0; height: auto; font: inherit; letter-spacing: normal; color: #ff8a5c; text-decoration: underline; text-underline-offset: 3px; }
 
 .sc { display: grid; grid-template-columns: 184px minmax(0, 1fr); grid-template-rows: 1fr auto; margin-top: 16px; background: var(--paper-card);
   border: 1px solid var(--card-line); border-radius: 22px; overflow: hidden; box-shadow: 0 12px 32px -22px rgba(20, 30, 50, 0.3); }

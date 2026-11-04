@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
+import { countBriefing } from "@/lib/db";
 import { domainsOf, isEnglishEdition, marketFor, outletForUrl } from "@/lib/sources";
 import { sampleBriefing } from "@/lib/sample";
 import { TOPICS, type Article, type Briefing, type Leg, type Profile } from "@/lib/types";
 
 export const maxDuration = 120;
+
+// Each request is a paid Perplexity search. The limit is per network, and a class on one Wi-Fi shares it.
+const DAILY_LIMIT = 300;
+const MAX_COUNT = 10;
 
 const SCHEMA = {
   type: "object",
@@ -219,14 +224,22 @@ async function articleImages(url: string): Promise<string[]> {
 }
 
 export async function POST(req: Request) {
-  const body = (await req.json()) as Partial<Req>;
+  const body = (await req.json().catch(() => null)) as Partial<Req> | null;
+  if (!body?.profile || !body.leg?.country) return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   const { profile, leg } = body as Req;
-  const r: Req = { profile, leg, count: body.count ?? 5, topic: body.topic, exclude: body.exclude ?? [] };
+  const r: Req = { profile, leg, count: Math.min(Number(body.count) || 5, MAX_COUNT), topic: body.topic, exclude: body.exclude ?? [] };
   if (!marketFor(leg.country)) {
-    return NextResponse.json({ error: `${leg.country} is not a covered market yet` }, { status: 400 });
+    return NextResponse.json({ error: `${leg.country} is not a covered market yet.` }, { status: 400 });
   }
   if (!process.env.PERPLEXITY_API_KEY) {
     return NextResponse.json(sampleBriefing(profile, leg, r.count, r.topic));
+  }
+  try {
+    if ((await countBriefing(req)) > DAILY_LIMIT) {
+      return NextResponse.json({ error: "Worldesk has reached today's limit for your network. It resets within 24 hours." }, { status: 429 });
+    }
+  } catch (e) {
+    console.error("briefing usage check failed", (e as Error).message); // a database hiccup shouldn't take the briefing down
   }
   try {
     // Topic deep-dives look back a month so there is enough to explore; the top briefing stays on this week
@@ -246,6 +259,7 @@ export async function POST(req: Request) {
     };
     return NextResponse.json(briefing);
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 502 });
+    console.error("briefing failed", (e as Error).message); // details stay in the server logs, not on the reader's screen
+    return NextResponse.json({ error: "The news search is temporarily unavailable." }, { status: 502 });
   }
 }

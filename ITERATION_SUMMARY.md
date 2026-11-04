@@ -258,3 +258,21 @@ Readers can now change their survey answers after submitting. The sidebar shows 
 
 > I think there is a edge case that what if the user may want to edit their survey response? now once they submit they won't able to reopen it
 
+### 29. Earlier survey invitation
+
+The survey invitation now appears after 30 seconds of browsing instead of 3 minutes, so readers who skim without expanding stories are still asked. Only time with the page on screen counts. Expanding 3 stories still triggers it sooner.
+
+**Prompt**:
+
+> I think the time should change. what if a user click 3 stories but never expand it? so may be add a logic that if a user browsing the website for more than 30 seconds.
+
+### 30. Friendlier errors, a daily limit, and deploy
+
+When the news search fails, readers now see a plain sentence and a "Try again" link instead of the raw Perplexity error; the details go to the server logs. Each network gets 300 briefing searches a day, so the public briefing address can't drain the paid credits. Sample-account visitors keep the survey invitation, and their responses will be filtered out of charts. Then pushed to GitHub and redeployed worldesk.vercel.app with the survey.
+
+**Prompt**:
+
+> prviously had an error. I now added paid credits to my account
+>
+> yes make both fixes, keep the invite, then deploy.
+

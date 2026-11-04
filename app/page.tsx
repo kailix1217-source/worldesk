@@ -774,8 +774,8 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
           exclude: existing?.articles.map((a) => a.url) ?? [],
         }),
       });
-      const json = (await res.json()) as Briefing & { error?: string };
-      if (!res.ok) throw new Error(json.error || "Request failed");
+      const json = (await res.json().catch(() => ({}))) as Briefing & { error?: string };
+      if (!res.ok) throw new Error(json.error || "The news search is temporarily unavailable.");
       const known = new Set(existing?.articles.map((a) => a.url));
       const fresh = json.articles.filter((a) => !known.has(a.url)).length;
       if (!reset && existing && fresh === 0) {
@@ -800,7 +800,8 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
         setTimeout(() => profile.topics.forEach((t) => fetchMore(leg, t)), 50);
       }
     } catch (e) {
-      const msg = (e as Error).name === "AbortError" ? "the search took too long" : (e as Error).message;
+      const msg = (e as Error).name === "AbortError" ? "The search took too long."
+        : e instanceof TypeError ? "We couldn't reach the news search. Check your connection." : (e as Error).message;
       setErrors((x) => ({ ...x, [k]: msg }));
     } finally {
       clearTimeout(timer);
@@ -960,7 +961,10 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
               return (
                 <li key={l.id}>
                   <button onClick={() => go(l.id)}>{marketFor(l.country)?.code}</button>
-                  <span>{f?.note || (err ? `Couldn't load ${l.country} (${err}).` : busy[bkey(l, "top")] ? `Reading ${l.country}'s local press…` : "Waiting to load…")}</span>
+                  <span>
+                    {f?.note || (err ? `Couldn't load ${l.country}. ${err} ` : busy[bkey(l, "top")] ? `Reading ${l.country}'s local press…` : "Waiting to load…")}
+                    {!f?.note && err && <button className="summary-retry" onClick={() => fetchMore(l, "top", false, true)}>Try again</button>}
+                  </span>
                 </li>
               );
             })}
@@ -1019,7 +1023,7 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
         )}
         {error && (
           <div className="error">
-            Couldn&apos;t load stories ({error}).{" "}
+            Couldn&apos;t load stories. {error}{" "}
             <button className="btn link" onClick={() => fetchMore(leg, filter)}>Try again</button>
           </div>
         )}
