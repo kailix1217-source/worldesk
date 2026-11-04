@@ -205,7 +205,7 @@ export const MARKETS: Market[] = [
 ];
 
 // Markets offered in onboarding, in picker order.
-export const ONBOARD_MARKETS = ["US", "UK", "DE", "JP", "AU", "FR", "IN", "BR", "CN", "CA", "SG", "AE"]
+export const ONBOARD_MARKETS = ["US", "UK", "DE", "JP", "AU", "FR", "IN", "BR", "CN", "CA", "SG", "MX"]
   .map((code) => MARKETS.find((m) => m.code === code)!)
   .filter(Boolean);
 
