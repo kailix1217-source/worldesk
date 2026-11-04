@@ -16,7 +16,9 @@ type Meta = {
 type Draft = { step: number; answers: SurveyAnswers; startedAt: number; edit?: boolean };
 type Ui = "hidden" | "invite" | "panel" | "pill" | "thanks";
 
-const META = "wd.survey", DRAFT = "wd.survey.draft";
+// The sample account keeps its own survey state, separate from the reader's real account.
+const metaKey = (demo: boolean) => (demo ? "wd.survey.sample" : "wd.survey");
+const draftKey = (demo: boolean) => `${metaKey(demo)}.draft`;
 const MAX_INVITES = 2;
 const SNOOZE_MS = 24 * 3600_000;
 const INVITE_AFTER_OPENS = 3, INVITE_AFTER_MS = 30_000;
@@ -36,9 +38,9 @@ const timeLeft = (step: number) => {
   return step === STEPS - 1 ? "Last step" : s > 60 ? "Less than 2 min left" : s > 30 ? "Under a minute left" : "Under 30 seconds left";
 };
 
-export function useSurveyDone() {
+export function useSurveyDone(demo: boolean) {
   const [done, setDone] = useState(false);
-  useEffect(() => { setDone(load<Meta>(META, { status: "new", invites: 0 }).status === "done"); }, []);
+  useEffect(() => { setDone(load<Meta>(metaKey(demo), { status: "new", invites: 0 }).status === "done"); }, [demo]);
   return [done, setDone] as const;
 }
 
@@ -62,6 +64,7 @@ export function Survey({ profile, demo, opens, openReq, onDone }: {
       body: JSON.stringify({ type, step, session: sid() }),
     }).catch(() => {});
   };
+  const META = metaKey(demo), DRAFT = draftKey(demo);
   const updateMeta = (m: Meta) => { setMeta(m); save(META, m); };
   // Functional updates, so quick successive taps never overwrite each other with a stale draft.
   const updateDraft = (f: (d: Draft) => Draft) => setDraft((d) => { const n = f(d); save(DRAFT, n); return n; });
@@ -74,8 +77,14 @@ export function Survey({ profile, demo, opens, openReq, onDone }: {
     const d = load<Draft | null>(DRAFT, null);
     if (d && m.status !== "done") { setDraft(d); setUi("pill"); }
     else if (d) save(DRAFT, null); // an unsaved edit is dropped on reload
-
-    setLoaded(true);
+    // A signed-in reader's answers live with their account, so they show on any device.
+    if (!demo) {
+      fetch("/api/survey").then((r) => (r.ok ? r.json() : null)).then((j) => {
+        if (!j?.submitted) return;
+        const next = { ...m, status: "done" as const, submitted: j.submitted };
+        setMeta(next); save(META, next); save(DRAFT, null); setUi("hidden"); onDone();
+      }).catch(() => {}).finally(() => setLoaded(true));
+    } else setLoaded(true);
   }, []);
 
   // Browsing time only runs while the page is on screen, so a tab left in the background doesn't count.
@@ -108,7 +117,7 @@ export function Survey({ profile, demo, opens, openReq, onDone }: {
   useEffect(() => {
     if (openReq <= 0) return;
     if (meta.status !== "done") start();
-    else if (meta.editToken && meta.submitted) startEdit();
+    else if (meta.submitted && (!demo || meta.editToken)) startEdit();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openReq]);
 
@@ -232,7 +241,7 @@ export function Survey({ profile, demo, opens, openReq, onDone }: {
         <div className="sv-body sv-thanks" role="status">
           <div className="sv-check" aria-hidden="true">✓</div>
           <h3>{edit ? "Your changes are saved." : <>Thanks — you&apos;re shaping what we build next.</>}</h3>
-          {!edit && meta.editToken && <p className="sv-hint">Changed your mind? You can edit your answers from the sidebar.</p>}
+          {!edit && (!demo || meta.editToken) && <p className="sv-hint">Changed your mind? You can edit your answers from the sidebar.</p>}
         </div>
       ) : (
         <>

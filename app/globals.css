@@ -646,6 +646,8 @@ article.story[data-url] { padding: 24px 26px; margin-top: 18px; }
 .kw-hit { font-size: 11.5px; font-weight: 600; color: var(--signal-text); background: var(--signal-tint); border: 1px solid #f6c9b4; border-radius: 999px; padding: 2px 9px; }
 
 /* ---------- v30: in-app feedback survey (invitation, drawer, resume pill) ---------- */
+.btn-google { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.btn-google svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .sb-fb { display: flex; flex-direction: column; line-height: 1.25; }
 .sb-fb small { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.04em; color: var(--muted); }
 .sb-feedback.sent { color: var(--muted); }
@@ -720,3 +722,18 @@ article.story[data-url] { padding: 24px 26px; margin-top: 18px; }
     border-radius: 24px 24px 0 0; box-shadow: 0 -30px 80px -40px rgba(20, 30, 50, 0.5); animation: sv-up 0.3s ease-out; }
   @keyframes sv-up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
 }
+
+/* v35: privacy page */
+.privacy h1 { font-size: 36px; margin: 32px 0 12px; }
+.privacy h2 { font-size: 21px; margin: 34px 0 10px; }
+.privacy h3 { font-size: 16px; margin: 20px 0 6px; }
+.privacy p, .privacy li { font-size: 16px; line-height: 1.6; }
+.privacy p { margin: 0 0 12px; }
+.privacy ul { margin: 0 0 12px; padding-left: 20px; }
+.privacy li { margin-bottom: 6px; }
+.privacy a:not(.wordmark) { color: var(--link-ink); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.privacy .wordmark { text-decoration: none; }
+.privacy-lead { color: var(--muted); }
+.privacy-back { margin-top: 32px; }
+.ob-note a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.ld-links a { color: #55585f; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }

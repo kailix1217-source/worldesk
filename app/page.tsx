@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ONBOARD_MARKETS, marketFor } from "@/lib/sources";
+import { DEMO_PROFILE } from "@/lib/demo";
+import { authClient } from "@/lib/auth/client";
 import { DOTS, PINS, WORLD } from "@/lib/worldDots";
 import { Survey, useSurveyDone } from "./survey";
 import {
@@ -21,11 +23,6 @@ const iso = (d: Date) =>
 const fmt = (d: string) =>
   d ? new Date(d + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
 
-const DEMO_PROFILE: Profile = {
-  name: "Maya", email: "maya@example.com", title: "Marketing Director, EMEA & APAC", company: "",
-  industry: "Automotive", func: "Marketing & Communications", markets: ["Germany", "Japan"],
-  topics: ["Competitors", "Consumer Trends", "Regulation & Policy"], keywords: ["EV batteries", "Chinese EV brands"],
-};
 
 function load<T>(key: string, fallback: T): T {
   try { const v = localStorage.getItem(key); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; }
@@ -46,6 +43,11 @@ function loadProfile(): Profile {
   return p;
 }
 
+// Saves part of a signed-in reader's data to their account. Failures are quiet: the browser still has it.
+const syncAccount = (part: { profile?: Profile; saved?: Article[]; alerts?: unknown }) => {
+  fetch("/api/account", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(part), keepalive: true }).catch(() => {});
+};
+
 // The briefing is organised by market; each market is searched through its business hub.
 const legsFor = (markets: string[]): Leg[] =>
   markets.map((c) => marketFor(c)).filter((m): m is NonNullable<typeof m> => !!m)
@@ -55,20 +57,62 @@ export default function Home() {
   const [ready, setReady] = useState(false);
   const [step, setStep] = useState<Step>("welcome");
   const [profile, setProfile] = useState<Profile>(EMPTY_PROFILE);
+  const [accountError, setAccountError] = useState("");
   const [signedIn, setSignedIn] = useState(false);
   const [demo, setDemo] = useState(false); // the sample executive never overwrites the user's own account
   // Editing from Settings reuses a setup screen as a single-step editor, then returns to Settings.
   const [editFrom, setEditFrom] = useState<Profile | null>(null);
   const [briefView, setBriefView] = useState<View>("all");
 
+  // On load: is there a Google session? If so, open the reader's Worldesk account (created on the first visit).
+  const started = useRef(false); // React's development mode runs effects twice; sign-in must only run once
   useEffect(() => {
-    const p = loadProfile();
-    setProfile(p);
-    // Profiles from before accounts existed count as signed in.
-    setSignedIn(load<boolean | null>("wd.session", null) ?? !!(p.name && p.industry));
-    setReady(true);
+    if (started.current) return;
+    started.current = true;
+    (async () => {
+      const local = loadProfile();
+      setProfile(local);
+      const justSignedIn = new URLSearchParams(window.location.search).has("signedIn");
+      // Neon finishes the Google sign-in from a one-time value in the address, so tidy the address only after this.
+      const { data } = await authClient.getSession().catch(() => ({ data: null }));
+      if (justSignedIn) window.history.replaceState(null, "", "/");
+      const user = data?.user;
+      if (justSignedIn && !user) {
+        setAccountError("We couldn't finish signing you in. Please try again.");
+        setStep("account");
+      }
+      if (user) {
+        const email = user.email.toLowerCase();
+        // A profile set up in this browser before accounts existed moves into the account if the email matches.
+        const carried = local.email === email ? { profile: local, saved: load("wd.saved", []), alerts: load("wd.alerts", null) } : {};
+        const res = await fetch("/api/account", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(carried) }).catch(() => null);
+        const json = await res?.json().catch(() => null);
+        if (res?.ok && json) {
+          const p: Profile = { ...EMPTY_PROFILE, ...json.profile, name: json.profile?.name || user.name || "", email };
+          setProfile(p);
+          save("wd.saved", json.saved ?? []);
+          save("wd.alerts", json.alerts ?? {});
+          setSignedIn(true);
+          if (justSignedIn) {
+            if (p.industry && p.func && p.markets.length) openBriefing(); else setStep("about");
+          }
+        } else {
+          if (res?.status === 403) await authClient.signOut().catch(() => {}); // today's new accounts are used up
+          setAccountError(json?.error || "We couldn't open your account. Please try again.");
+          setStep("account");
+        }
+      }
+      setReady(true);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  useEffect(() => { if (ready) { save("wd.profile", profile); save("wd.session", signedIn); } }, [ready, profile, signedIn]);
+  useEffect(() => { if (ready) save("wd.profile", profile); }, [ready, profile]);
+  // Keep the account's copy of the profile up to date, a moment after the last change.
+  useEffect(() => {
+    if (!ready || !signedIn) return;
+    const t = setTimeout(() => syncAccount({ profile }), 800);
+    return () => clearTimeout(t);
+  }, [ready, signedIn, profile]);
   useEffect(() => { window.scrollTo(0, 0); }, [step]);
 
   const openBriefing = (view: View = "all") => { setBriefView(view); setStep("briefing"); };
@@ -76,18 +120,28 @@ export default function Home() {
   const startEdit = (s: Step) => { setEditFrom(profile); setStep(s); };
   const saveEdit = () => { setEditFrom(null); openBriefing("settings"); };
   const cancelEdit = () => { if (editFrom) setProfile(editFrom); setEditFrom(null); openBriefing("settings"); };
+  const switchAccount = async () => { await logOut(); setStep("account"); };
+  const sessionLost = () => { setSignedIn(false); setAccountError("Please sign in again to load your briefing."); setStep("account"); };
   const exitDemo = () => { setDemo(false); setStep("welcome"); };
-  const logOut = () => { setSignedIn(false); setStep("welcome"); };
+  // Signing out leaves nothing personal behind, in case the computer is shared.
+  const logOut = async () => {
+    await authClient.signOut().catch(() => {});
+    try {
+      Object.keys(localStorage).filter((k) => k.startsWith("wd.") && !k.startsWith("wd.ind.")).forEach((k) => localStorage.removeItem(k));
+    } catch { /* storage unavailable */ }
+    setProfile(EMPTY_PROFILE);
+    setSignedIn(false);
+    setStep("welcome");
+  };
 
   if (!ready) return null;
-  const hasAccount = !!(profile.name && profile.email);
-  const returning = !!(signedIn && hasAccount && profile.industry && profile.func && profile.markets.length);
+  const returning = !!(signedIn && profile.industry && profile.func && profile.markets.length);
 
   if (step === "welcome") {
     return (
       <Welcome
         returning={returning} name={profile.name.split(" ")[0]}
-        onStart={() => setStep(signedIn && hasAccount ? "about" : "account")} onOpen={() => openBriefing()}
+        onStart={() => setStep("account")} onOpen={() => openBriefing()}
         onEdit={() => setStep("about")} onDemo={startDemo}
       />
     );
@@ -96,7 +150,7 @@ export default function Home() {
   if (step === "briefing") {
     return (
       <BriefingView key={demo ? "demo" : profile.markets.join(",")} profile={demo ? DEMO_PROFILE : profile} demo={demo}
-        initialView={briefView} onEdit={startEdit} onHome={() => setStep("welcome")} onLogout={logOut} onExitDemo={exitDemo} />
+        initialView={briefView} onEdit={startEdit} onHome={() => setStep("welcome")} onLogout={logOut} onExitDemo={exitDemo} onSessionLost={sessionLost} />
     );
   }
 
@@ -119,12 +173,10 @@ export default function Home() {
         </div>
       )}
       {step === "account" && (
-        <AccountStep profile={profile} setProfile={setProfile} initialMode={hasAccount && !signedIn ? "login" : "create"}
-          onNext={() => { setSignedIn(true); setStep("about"); }}
-          onLoggedIn={(complete) => { setSignedIn(true); if (complete) openBriefing(); else setStep("about"); }} />
+        <AccountStep error={accountError} email={signedIn ? profile.email : ""} onContinue={() => setStep("about")} onSwitch={switchAccount} />
       )}
       {step === "about" && (
-        <AboutStep profile={profile} setProfile={setProfile} edit={edit} onBack={() => setStep(hasAccount ? "welcome" : "account")} onNext={() => setStep("markets")} />
+        <AboutStep profile={profile} setProfile={setProfile} edit={edit} onBack={() => setStep("account")} onNext={() => setStep("markets")} />
       )}
       {step === "markets" && (
         <MarketsStep profile={profile} setProfile={setProfile} edit={edit} onBack={() => setStep("about")} onNext={() => setStep("topics")} />
@@ -183,6 +235,7 @@ function Welcome({ returning, name, onStart, onOpen, onEdit, onDemo }: {
             <div className="ld-links">
               <button onClick={onEdit}>Edit profile</button>
               <button onClick={onDemo}>View sample executive</button>
+              <a href="/privacy">Privacy</a>
             </div>
           </>
         ) : (
@@ -190,6 +243,7 @@ function Welcome({ returning, name, onStart, onOpen, onEdit, onDemo }: {
             <button className="ld-cta" onClick={onStart}>SET UP MY BRIEFING <span aria-hidden="true">→</span></button>
             <div className="ld-links">
               <button onClick={onDemo}>See a sample executive</button>
+              <a href="/privacy">Privacy</a>
             </div>
           </>
         )}
@@ -307,7 +361,6 @@ function BrandBanner() {
   );
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type EditMode = { onCancel: () => void; onSave: () => void };
 
@@ -321,80 +374,45 @@ function StepHead({ n, title, sub, center, editLabel }: { n: number; title: stri
   );
 }
 
-// Prototype account: kept only in this browser. The password is checked for length and then discarded.
-function AccountStep({ profile, setProfile, initialMode, onNext, onLoggedIn }: {
-  profile: Profile; setProfile: (p: Profile) => void; initialMode: "create" | "login";
-  onNext: () => void; onLoggedIn: (complete: boolean) => void;
-}) {
-  const [mode, setMode] = useState<"create" | "login">(initialMode);
-  const [name, setName] = useState(profile.name);
-  const [email, setEmail] = useState(profile.email);
-  const [password, setPassword] = useState("");
-  const [touched, setTouched] = useState(false);
-  const [error, setError] = useState("");
-
-  const emailOk = EMAIL_RE.test(email.trim());
-  const pwOk = password.length >= 8;
-  const canCreate = name.trim() && emailOk && pwOk;
-
-  const create = (e: React.FormEvent) => {
-    e.preventDefault();
-    setTouched(true);
-    if (!canCreate) return;
-    const addr = email.trim().toLowerCase();
-    // A different email on this device is a new person: start from a blank profile.
-    const base = profile.email && profile.email !== addr ? EMPTY_PROFILE : profile;
-    setProfile({ ...base, name: name.trim(), email: addr });
-    setPassword("");
-    onNext();
+// Worldesk accounts use Google sign-in only. The same button creates an account or logs back in.
+// Step 1 always shows, so a reader who is already signed in can see which account they're using.
+function AccountStep({ error, email, onContinue, onSwitch }: { error: string; email: string; onContinue: () => void; onSwitch: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState("");
+  const signIn = async () => {
+    setBusy(true);
+    setFailed("");
+    const { error: e } = await authClient.signIn.social({ provider: "google", callbackURL: "/?signedIn=1" })
+      .catch(() => ({ error: { message: "" } }));
+    if (e) { setFailed("We couldn't reach Google. Please try again."); setBusy(false); }
   };
-  const login = (e: React.FormEvent) => {
-    e.preventDefault();
-    setTouched(true);
-    if (!emailOk || !pwOk) return;
-    const saved = loadProfile();
-    if (saved.email && saved.email === email.trim().toLowerCase()) {
-      setProfile(saved);
-      setPassword("");
-      onLoggedIn(!!(saved.industry && saved.func && saved.markets.length));
-    } else {
-      setError("No Worldesk account with that email on this device. Create one instead.");
-    }
-  };
-
+  if (email) {
+    return (
+      <section className="ob ob-narrow">
+        <StepHead n={1} center title="You're signed in" sub={email} />
+        <div className="ob-form">
+          <button className="btn ob-full" onClick={onContinue}>Continue</button>
+        </div>
+        <p className="ob-switch"><button className="btn link" onClick={onSwitch}>Use a different account</button></p>
+      </section>
+    );
+  }
   return (
     <section className="ob ob-narrow">
-      <StepHead n={1} center title={mode === "create" ? "Create your account" : "Log in"}
-        sub={mode === "create" ? "Set up your personalized briefing." : "Welcome back. Open your briefing."} />
-      <form className="ob-form" onSubmit={mode === "create" ? create : login} noValidate>
-        {mode === "create" && (
-          <div className="field">
-            <label htmlFor="acc-name">Full name</label>
-            <input id="acc-name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Doe" />
-            {touched && !name.trim() && <span className="field-err">Enter your name.</span>}
-          </div>
-        )}
-        <div className="field">
-          <label htmlFor="acc-email">Email</label>
-          <input id="acc-email" type="email" autoComplete="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(""); }} placeholder="executive@company.com" />
-          {touched && !emailOk && <span className="field-err">Enter a valid email address.</span>}
-        </div>
-        <div className="field">
-          <label htmlFor="acc-pw">Password</label>
-          <input id="acc-pw" type="password" autoComplete={mode === "create" ? "new-password" : "current-password"}
-            value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" />
-          {touched && !pwOk && <span className="field-err">Use at least 8 characters.</span>}
-        </div>
-        {error && <p className="field-err" role="alert">{error}</p>}
-        <button type="submit" className="btn ob-full">{mode === "create" ? "Continue" : "Log in"}</button>
-      </form>
-      <p className="ob-switch">
-        {mode === "create" ? "Already have an account? " : "New to Worldesk? "}
-        <button className="btn link" onClick={() => { setMode(mode === "create" ? "login" : "create"); setTouched(false); setError(""); }}>
-          {mode === "create" ? "Log in" : "Create an account"}
+      <StepHead n={1} center title="Create an account or sign in" sub="Set up your personalized briefing." />
+      <div className="ob-form">
+        {(failed || error) && <p className="field-err" role="alert">{failed || error}</p>}
+        <button className="btn ghost ob-full btn-google" disabled={busy} onClick={signIn}>
+          <svg viewBox="0 0 18 18" aria-hidden="true">
+            <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z" />
+            <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z" />
+            <path fill="#FBBC05" d="M3.97 10.72a5.41 5.41 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z" />
+            <path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z" />
+          </svg>
+          {busy ? "Opening Google…" : "Continue with Google"}
         </button>
-      </p>
-      <p className="ob-note">Prototype: your account stays in this browser only. Passwords are never saved.</p>
+      </div>
+      <p className="ob-note">Worldesk receives only your name, email and profile picture. It can&apos;t read your Gmail. <a href="/privacy">Privacy</a></p>
     </section>
   );
 }
@@ -714,8 +732,8 @@ function IndicatorStrip({ country }: { country: string }) {
   );
 }
 
-function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, onExitDemo }: {
-  profile: Profile; demo: boolean; initialView: View; onEdit: (s: Step) => void; onHome: () => void; onLogout: () => void; onExitDemo: () => void;
+function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, onExitDemo, onSessionLost }: {
+  profile: Profile; demo: boolean; initialView: View; onEdit: (s: Step) => void; onHome: () => void; onLogout: () => void; onExitDemo: () => void; onSessionLost: () => void;
 }) {
   const legs = useMemo(() => legsFor(profile.markets), [profile.markets]);
   // No topics chosen means no restriction: offer every topic as a filter.
@@ -733,7 +751,7 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
   // Feedback survey: stories opened this visit (an invitation trigger) and sidebar requests to open it.
   const [opens, setOpens] = useState(0);
   const [surveyReq, setSurveyReq] = useState(0);
-  const [surveyDone, setSurveyDone] = useSurveyDone();
+  const [surveyDone, setSurveyDone] = useSurveyDone(demo);
   // Size of each candidate picture, measured in the browser (0 = failed to load or blocked).
   const [imgSize, setImgSize] = useState<Record<string, { w: number; h: number }>>({});
   const feedsRef = useRef(feeds);
@@ -768,13 +786,14 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
       const res = await fetch("/api/briefing", {
         method: "POST", headers: { "Content-Type": "application/json" }, signal: ctrl.signal,
         body: JSON.stringify({
-          profile, leg,
+          profile, leg, demo,
           count: f === "top" ? STORY_COUNT : 5,
           topic: f === "top" ? undefined : f,
           exclude: existing?.articles.map((a) => a.url) ?? [],
         }),
       });
       const json = (await res.json().catch(() => ({}))) as Briefing & { error?: string };
+      if (res.status === 401) { onSessionLost(); return; }
       if (!res.ok) throw new Error(json.error || "The news search is temporarily unavailable.");
       const known = new Set(existing?.articles.map((a) => a.url));
       const fresh = json.articles.filter((a) => !known.has(a.url)).length;
@@ -868,9 +887,10 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
     const next = isSaved(a.url) ? saved.filter((s) => s.url !== a.url) : [{ ...a }, ...saved];
     setSaved(next);
     save("wd.saved", next);
+    if (!demo) syncAccount({ saved: next });
   };
 
-  const saveAlerts = (next: Alerts) => { setAlerts(next); save("wd.alerts", next); };
+  const saveAlerts = (next: Alerts) => { setAlerts(next); save("wd.alerts", next); if (!demo) syncAccount({ alerts: next }); };
   const firstStory = legs.map((l) => feeds[l.id]?.articles[0]).find(Boolean);
   // Push notification: readable on its own; tapping it opens the market and scrolls to the story.
   const notify = (a: Article | undefined) => {
@@ -1158,7 +1178,7 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
         <div className="bf-col">
           {body}
           <footer className="foot">
-            Worldesk prototype · Stories are selected and translated by AI from a fixed list of local outlets. Always check the original before you quote it.
+            Worldesk prototype · Stories are selected and translated by AI from a fixed list of local outlets. Always check the original before you quote it. <a href="/privacy">Privacy</a>
           </footer>
         </div>
       </main>

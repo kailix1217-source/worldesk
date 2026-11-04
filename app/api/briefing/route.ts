@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
-import { countBriefing } from "@/lib/db";
+import { currentUser } from "@/lib/auth/server";
+import { countBriefing, ensureSchema, ipHash, sql } from "@/lib/db";
+import { DEMO_PROFILE } from "@/lib/demo";
 import { domainsOf, isEnglishEdition, marketFor, outletForUrl } from "@/lib/sources";
 import { sampleBriefing } from "@/lib/sample";
 import { TOPICS, type Article, type Briefing, type Leg, type Profile } from "@/lib/types";
 
 export const maxDuration = 120;
 
-// Each request is a paid Perplexity search. The limit is per network, and a class on one Wi-Fi shares it.
-const DAILY_LIMIT = 300;
+// Each request is a paid Perplexity search, so personal briefings need an account and a daily limit.
+const ACCOUNT_DAILY_LIMIT = 50;
+const SAMPLE_NETWORK_LIMIT = 300; // only reached when the day's saved sample is missing
 const MAX_COUNT = 10;
 
 // Perplexity rejects searches over its per-second limit (429) and says when to try again.
@@ -236,43 +239,87 @@ async function articleImages(url: string): Promise<string[]> {
   }
 }
 
+async function runBriefing(r: Req): Promise<Briefing> {
+  // Topic deep-dives look back a month so there is enough to explore; the top briefing stays on this week
+  let { parsed, results, market } = await search(r, r.topic ? "month" : "week");
+  const kw = keywordsOf(r.profile);
+  let articles = clean(parsed, results, market, r.exclude, r.topic, kw);
+  if (articles.length < 3 && !r.topic) {
+    ({ parsed, results, market } = await search(r, "month"));
+    articles = clean(parsed, results, market, r.exclude, r.topic, kw);
+  }
+  const top = articles.slice(0, r.count);
+  const images = await Promise.all(top.map((a) => articleImages(a.url)));
+  return {
+    landing_note: parsed.landing_note,
+    articles: top.map((a, i) => (images[i].length ? { ...a, image: images[i][0], images: images[i] } : a)),
+    source: "live",
+  };
+}
+
+const limitReached = (error: string) => NextResponse.json({ error }, { status: 429 });
+const searchFailed = (e: unknown) => {
+  console.error("briefing failed", (e as Error).message); // details stay in the server logs, not on the reader's screen
+  return NextResponse.json({ error: "The news search is temporarily unavailable." }, { status: 502 });
+};
+
+// The sample needs no account, so it only ever searches for the fixed sample profile, once a day per market and topic.
+async function sampleResponse(req: Request, leg: Leg, topic: string | undefined, exclude: string[]) {
+  if (!DEMO_PROFILE.markets.includes(leg.country) || (topic && !DEMO_PROFILE.topics.includes(topic))) {
+    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+  }
+  const key = `${leg.country}|${topic ?? "top"}`;
+  const serve = (b: Briefing) => NextResponse.json({ ...b, articles: b.articles.filter((a) => !exclude.includes(a.url)) });
+  try {
+    await ensureSchema();
+    const [hit] = (await sql`SELECT payload FROM sample_cache
+      WHERE key = ${key} AND day = (now() AT TIME ZONE 'America/Los_Angeles')::date`) as { payload: Briefing }[];
+    if (hit) return serve(hit.payload);
+    if ((await countBriefing(ipHash(req))) > SAMPLE_NETWORK_LIMIT) {
+      return limitReached("Worldesk has reached today's limit for your network. It resets within 24 hours.");
+    }
+  } catch (e) {
+    console.error("sample cache failed", (e as Error).message);
+  }
+  try {
+    const briefing = await runBriefing({ profile: DEMO_PROFILE, leg, count: topic ? 5 : 6, topic, exclude: [] });
+    await sql`INSERT INTO sample_cache (key, payload) VALUES (${key}, ${JSON.stringify(briefing)}::jsonb) ON CONFLICT DO NOTHING`.catch(() => {});
+    return serve(briefing);
+  } catch (e) {
+    return searchFailed(e);
+  }
+}
+
 export async function POST(req: Request) {
-  const body = (await req.json().catch(() => null)) as Partial<Req> | null;
-  if (!body?.profile || !body.leg?.country) return NextResponse.json({ error: "Invalid request." }, { status: 400 });
-  const { profile, leg } = body as Req;
-  const r: Req = { profile, leg, count: Math.min(Number(body.count) || 5, MAX_COUNT), topic: body.topic, exclude: body.exclude ?? [] };
+  const body = (await req.json().catch(() => null)) as (Partial<Req> & { demo?: boolean }) | null;
+  if (!body?.leg?.country) return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+  const leg = body.leg;
   if (!marketFor(leg.country)) {
     return NextResponse.json({ error: `${leg.country} is not a covered market yet.` }, { status: 400 });
   }
+  const exclude = body.exclude ?? [];
+  const count = Math.min(Number(body.count) || 5, MAX_COUNT);
   if (!process.env.PERPLEXITY_API_KEY) {
-    return NextResponse.json(sampleBriefing(profile, leg, r.count, r.topic));
+    return NextResponse.json(sampleBriefing(body.profile ?? DEMO_PROFILE, leg, count, body.topic));
   }
+  if (body.demo) return sampleResponse(req, leg, body.topic, exclude);
+
+  const user = await currentUser();
+  if (!user) return NextResponse.json({ error: "Please sign in to load your briefing." }, { status: 401 });
+  if (!body.profile) return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   try {
-    if ((await countBriefing(req)) > DAILY_LIMIT) {
-      return NextResponse.json({ error: "Worldesk has reached today's limit for your network. It resets within 24 hours." }, { status: 429 });
+    await ensureSchema();
+    const [account] = await sql`SELECT 1 FROM user_data WHERE user_id = ${user.id}`;
+    if (!account) return NextResponse.json({ error: "Please sign in to load your briefing." }, { status: 401 });
+    if ((await countBriefing(`user:${user.id}`)) > ACCOUNT_DAILY_LIMIT) {
+      return limitReached(`You've reached today's limit of ${ACCOUNT_DAILY_LIMIT} searches. It resets within 24 hours.`);
     }
   } catch (e) {
     console.error("briefing usage check failed", (e as Error).message); // a database hiccup shouldn't take the briefing down
   }
   try {
-    // Topic deep-dives look back a month so there is enough to explore; the top briefing stays on this week
-    let { parsed, results, market } = await search(r, r.topic ? "month" : "week");
-    const kw = keywordsOf(r.profile);
-    let articles = clean(parsed, results, market, r.exclude, r.topic, kw);
-    if (articles.length < 3 && !r.topic) {
-      ({ parsed, results, market } = await search(r, "month"));
-      articles = clean(parsed, results, market, r.exclude, r.topic, kw);
-    }
-    const top = articles.slice(0, r.count);
-    const images = await Promise.all(top.map((a) => articleImages(a.url)));
-    const briefing: Briefing = {
-      landing_note: parsed.landing_note,
-      articles: top.map((a, i) => (images[i].length ? { ...a, image: images[i][0], images: images[i] } : a)),
-      source: "live",
-    };
-    return NextResponse.json(briefing);
+    return NextResponse.json(await runBriefing({ profile: body.profile, leg, count, topic: body.topic, exclude }));
   } catch (e) {
-    console.error("briefing failed", (e as Error).message); // details stay in the server logs, not on the reader's screen
-    return NextResponse.json({ error: "The news search is temporarily unavailable." }, { status: 502 });
+    return searchFailed(e);
   }
 }

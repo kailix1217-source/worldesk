@@ -284,3 +284,27 @@ Perplexity limits how many searches can start each second, so briefings that ran
 
 > yes. (approving the retry fix, then Google-only accounts)
 
+### 32. Google accounts
+
+Worldesk accounts now use Google sign-in. Step 1 of onboarding is "Continue with Google"; returning readers go straight to their briefing, and already-signed-in readers see which account they are using. Profiles, saved stories and alert settings are stored in the database, so they survive signing out. Limits: 50 new accounts a day and 50 searches per account a day; the sample is searched once a day and saved for everyone. Survey responses are now one per account and editable from any device. Upgraded to Next.js 16, which Neon's sign-in package requires, and used a dedicated Google Cloud project.
+
+**Prompt**:
+
+> but, I actually do want user can register a worldesk account. they can either enter their email, or directly connect through their gmail account. Is this possible?
+>
+> one time code. people sign in or create account in their onboarding. may be limit to 50 account a day
+>
+> I don't want to spend money.
+>
+> if it can directly sign up through gmail, then do worldesk still need a code?
+
+### 33. Privacy page and Mexico
+
+Added a privacy page, linked from the first page, the sign-in step and the briefing footer, describing what is collected, who handles it and how to request deletion by email. Replaced the UAE with Mexico in the market picker; saved profiles that already follow the UAE keep working. Then pushed to GitHub.
+
+**Prompt**:
+
+> only add the privacy, don't add delete my account yet
+>
+> email use kailin.xu.2026@marshall.usc.edu. yes. no. also for the market, can you change the UAE option to Mexico? can we deploy it now?
+
