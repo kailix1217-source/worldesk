@@ -33,6 +33,12 @@ export default function PrivacyPage() {
         <li>Stories you save and your alert settings.</li>
         <li>How many searches your account ran that day, so we can apply a daily limit.</li>
         <li>
+          What you do while signed in, recorded with your account ID: how long onboarding took, when you open your
+          briefing, how long it takes to load, your active time on the page, and the stories, source links, markets and
+          topics you click or save. For stories we record only the outlet, market and topic, not the headline or article.
+          We don&apos;t record your screen or what you type. Nothing like this is recorded before you sign in or when you view the sample.
+        </li>
+        <li>
           Your browser also keeps stories you have seen and recent results so pages load faster. Signing out clears
           this, apart from saved economic figures, which contain nothing about you.
         </li>
@@ -56,6 +62,7 @@ export default function PrivacyPage() {
         <li>To keep your profile and saved stories available when you sign in.</li>
         <li>To understand what readers think of Worldesk and decide what to build next.</li>
         <li>To limit usage, because each search has a real cost.</li>
+        <li>To measure how people use Worldesk, such as active readers per week and which features get used, and to report totals in our course presentation.</li>
       </ul>
       <p>We don&apos;t sell your information, show advertising, or ask for your contacts.</p>
 

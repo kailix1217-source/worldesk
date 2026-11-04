@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ONBOARD_MARKETS, marketFor } from "@/lib/sources";
 import { DEMO_PROFILE } from "@/lib/demo";
 import { authClient } from "@/lib/auth/client";
+import { flushNow, markStoriesLoaded, setTracking, track, watchActiveTime } from "@/lib/track";
 import { DOTS, PINS, WORLD } from "@/lib/worldDots";
 import { Survey, useSurveyDone } from "./survey";
 import {
@@ -43,6 +44,23 @@ function loadProfile(): Profile {
   return p;
 }
 
+// Onboarding time starts at "Set up my briefing". The browser holds the start time and only sends
+// the total once the reader has signed in and finished, so signed-out visitors aren't tracked.
+const SESSION_TIMEOUT_MS = 10_000;
+const OB_CLOCK = "wd.ob.start";
+const OB_CLOCK_MAX_MS = 24 * 3600_000;
+const startOnboardingClock = () => {
+  const started = load<number | null>(OB_CLOCK, null);
+  if (!started || Date.now() - started > OB_CLOCK_MAX_MS) save(OB_CLOCK, Date.now());
+};
+const clearOnboardingClock = () => { try { localStorage.removeItem(OB_CLOCK); } catch { /* storage unavailable */ } };
+const stepDone = (step: string) => { if (load<number | null>(OB_CLOCK, null)) track("step_complete", { step }); };
+const finishOnboarding = () => {
+  const started = load<number | null>(OB_CLOCK, null);
+  if (started) track("onboarding_complete", { seconds: (Date.now() - started) / 1000 });
+  clearOnboardingClock();
+};
+
 // Saves part of a signed-in reader's data to their account. Failures are quiet: the browser still has it.
 const syncAccount = (part: { profile?: Profile; saved?: Article[]; alerts?: unknown }) => {
   fetch("/api/account", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(part), keepalive: true }).catch(() => {});
@@ -74,7 +92,9 @@ export default function Home() {
       setProfile(local);
       const justSignedIn = new URLSearchParams(window.location.search).has("signedIn");
       // Neon finishes the Google sign-in from a one-time value in the address, so tidy the address only after this.
-      const { data } = await authClient.getSession().catch(() => ({ data: null }));
+      // A session check that never answers must not leave the reader on a blank page.
+      const noSession = new Promise<{ data: null }>((r) => setTimeout(() => r({ data: null }), SESSION_TIMEOUT_MS));
+      const { data } = await Promise.race([authClient.getSession().catch(() => ({ data: null })), noSession]);
       if (justSignedIn) window.history.replaceState(null, "", "/");
       const user = data?.user;
       if (justSignedIn && !user) {
@@ -93,8 +113,10 @@ export default function Home() {
           save("wd.saved", json.saved ?? []);
           save("wd.alerts", json.alerts ?? {});
           setSignedIn(true);
+          setTracking(true);
           if (justSignedIn) {
-            if (p.industry && p.func && p.markets.length) openBriefing(); else setStep("about");
+            track("signed_in", { created: !!json.created });
+            if (p.industry && p.func && p.markets.length) { clearOnboardingClock(); openBriefing(); } else setStep("about");
           }
         } else {
           if (res?.status === 403) await authClient.signOut().catch(() => {}); // today's new accounts are used up
@@ -102,11 +124,11 @@ export default function Home() {
           setStep("account");
         }
       }
-      setReady(true);
-    })();
+    })().catch((e) => console.error("account load failed", e)).finally(() => setReady(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => { if (ready) save("wd.profile", profile); }, [ready, profile]);
+  useEffect(() => { if (ready) setTracking(signedIn && !demo); }, [ready, signedIn, demo]);
   // Keep the account's copy of the profile up to date, a moment after the last change.
   useEffect(() => {
     if (!ready || !signedIn) return;
@@ -125,6 +147,9 @@ export default function Home() {
   const exitDemo = () => { setDemo(false); setStep("welcome"); };
   // Signing out leaves nothing personal behind, in case the computer is shared.
   const logOut = async () => {
+    track("logout");
+    await flushNow();
+    setTracking(false);
     await authClient.signOut().catch(() => {});
     try {
       Object.keys(localStorage).filter((k) => k.startsWith("wd.") && !k.startsWith("wd.ind.")).forEach((k) => localStorage.removeItem(k));
@@ -141,7 +166,7 @@ export default function Home() {
     return (
       <Welcome
         returning={returning} name={profile.name.split(" ")[0]}
-        onStart={() => setStep("account")} onOpen={() => openBriefing()}
+        onStart={() => { if (!returning) startOnboardingClock(); setStep("account"); }} onOpen={() => openBriefing()}
         onEdit={() => setStep("about")} onDemo={startDemo}
       />
     );
@@ -176,13 +201,13 @@ export default function Home() {
         <AccountStep error={accountError} email={signedIn ? profile.email : ""} onContinue={() => setStep("about")} onSwitch={switchAccount} />
       )}
       {step === "about" && (
-        <AboutStep profile={profile} setProfile={setProfile} edit={edit} onBack={() => setStep("account")} onNext={() => setStep("markets")} />
+        <AboutStep profile={profile} setProfile={setProfile} edit={edit} onBack={() => setStep("account")} onNext={() => { stepDone("about"); setStep("markets"); }} />
       )}
       {step === "markets" && (
-        <MarketsStep profile={profile} setProfile={setProfile} edit={edit} onBack={() => setStep("about")} onNext={() => setStep("topics")} />
+        <MarketsStep profile={profile} setProfile={setProfile} edit={edit} onBack={() => setStep("about")} onNext={() => { stepDone("markets"); setStep("topics"); }} />
       )}
       {step === "topics" && (
-        <TopicsStep profile={profile} setProfile={setProfile} edit={edit} onBack={() => setStep("markets")} onNext={() => openBriefing()} />
+        <TopicsStep profile={profile} setProfile={setProfile} edit={edit} onBack={() => setStep("markets")} onNext={() => { stepDone("topics"); finishOnboarding(); openBriefing(); }} />
       )}
     </main>
   );
@@ -218,7 +243,7 @@ function Welcome({ returning, name, onStart, onOpen, onEdit, onDemo }: {
 
       <main className="ld-card">
         <span className="ld-brand">WORLDESK</span>
-        <h1 className="ld-title">Know the market before you land.</h1>
+        <h1 className="ld-title">Know your markets like a local.</h1>
         <p className="ld-sub">{returning && <b className="ld-welcome">Welcome back, {name}. </b>}Local business press, read in the local language and briefed in English for your role and the markets you follow.</p>
 
         <div className="ld-divider"><span>HOW IT WORKS</span></div>
@@ -348,7 +373,7 @@ function BrandBanner() {
     <div className="brand-banner" aria-hidden="true">
       <div className="bb-text">
         <div className="bb-word">Worldesk</div>
-        <div className="bb-tag">Know the market before you land.</div>
+        <div className="bb-tag">Know your markets like a local.</div>
       </div>
       <svg className="bb-art" viewBox="0 0 320 260" preserveAspectRatio="xMaxYMid meet">
         <rect x="196" y="8" width="124" height="244" rx="28" className="bb-surface" />
@@ -614,6 +639,10 @@ function StoryCard({ a, lead, isNew, saved, onSave, onTag, onOpen }: {
   const srcs = sourcesOf(a);
   const lang = marketFor(country)?.language;
   const showImage = lead && !!a.image && imgOk;
+  const toggle = (via: "button" | "headline") => {
+    if (!open) { onOpen(); track("story_open", { market: country, topic: a.category, outlet: a.outlet, via }); }
+    setOpen((v) => !v);
+  };
   return (
     <article className={`sc ${showImage ? "lead" : "compact"}`} data-url={a.url}>
       {showImage && (
@@ -628,25 +657,28 @@ function StoryCard({ a, lead, isNew, saved, onSave, onTag, onOpen }: {
           {(a.keywords ?? []).map((k) => <span key={k} className="kw-hit" title="Matches a keyword you track">{k}</span>)}
           <b>{a.outlet}</b>
           {country && <><i aria-hidden="true">·</i><span>{country}</span></>}
-          {a.date && <><i aria-hidden="true">·</i><span>{relDate(a.date)}</span></>}
+          {lang && lang !== "English" && <><i aria-hidden="true">·</i><span>in {lang}</span></>}
         </div>
         <button className={`sc-save ${saved ? "on" : ""}`} onClick={onSave} aria-pressed={saved}
           aria-label={saved ? "Remove from saved stories" : "Save story"} title={saved ? "Saved" : "Save"}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z" /></svg>
         </button>
-        <h3>{a.english_headline}</h3>
+        <h3><button className="sc-head" onClick={() => toggle("headline")} aria-expanded={open}>{a.english_headline}</button></h3>
         <div className="why"><b>Why it matters to you</b>{a.why_it_matters}</div>
         {open && <p className="sc-sum">{a.summary}</p>}
       </div>
+      <button className={`sc-toggle ${open ? "open" : ""}`} onClick={() => toggle("button")} aria-expanded={open}>
+        {open ? "Hide summary" : "Read summary"}
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+      </button>
       <footer className="sc-foot">
-        <span className="sc-count">{srcs.length} {srcs.length === 1 ? "source" : "sources"}{lang && lang !== "English" ? ` · in ${lang}` : ""}</span>
-        {srcs.map((s) => (
-          <a key={s.url} className="sc-link" href={s.url} target="_blank" rel="noopener noreferrer">View {s.outlet} ↗</a>
-        ))}
-        <button className={`sc-toggle ${open ? "open" : ""}`} onClick={() => { if (!open) onOpen(); setOpen((v) => !v); }} aria-expanded={open}
-          aria-label={open ? "Hide summary" : "Show summary"} title={open ? "Less" : "Read summary"}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
-        </button>
+        {a.date && <span className="sc-date">{relDate(a.date)}</span>}
+        <div className="sc-links">
+          {srcs.map((s) => (
+            <a key={s.url} className="sc-link" href={s.url} target="_blank" rel="noopener noreferrer"
+              onClick={() => track("source_click", { market: country, topic: a.category, outlet: s.outlet })}>View {s.outlet} ↗</a>
+          ))}
+        </div>
       </footer>
     </article>
   );
@@ -741,6 +773,12 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
   const [view, setView] = useState<View>(initialView);
   const [filter, setFilter] = useState("top");
   const [feeds, setFeeds] = useState<Record<string, Feed>>({});
+  useEffect(() => {
+    if (demo || storiesSeen.current || !Object.values(feeds).some((f) => f.articles.length)) return;
+    storiesSeen.current = true;
+    markStoriesLoaded((Date.now() - mountedAt.current) / 1000);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feeds]);
   // Loading is tracked per market AND per filter, so one slow request never blocks another.
   const [busy, setBusy] = useState<Record<string, number>>({}); // "legId|filter" -> startedAt
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
@@ -750,6 +788,16 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
   const [saved, setSaved] = useState<Article[]>(() => load<Article[]>("wd.saved", []));
   // Feedback survey: stories opened this visit (an invitation trigger) and sidebar requests to open it.
   const [opens, setOpens] = useState(0);
+  // Usage clock for the briefing: opened, how long stories took to appear, then time actually spent reading.
+  const mountedAt = useRef(Date.now());
+  const opened = useRef(false);
+  const storiesSeen = useRef(false);
+  useEffect(() => {
+    if (demo) return;
+    if (!opened.current) { opened.current = true; track("briefing_open", { view: String(initialView) }); }
+    return watchActiveTime();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [surveyReq, setSurveyReq] = useState(0);
   const [surveyDone, setSurveyDone] = useSurveyDone(demo);
   // Size of each candidate picture, measured in the browser (0 = failed to load or blocked).
@@ -858,7 +906,7 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
     setFilter("top");
     window.scrollTo(0, 0);
     const l = legs.find((x) => x.id === v);
-    if (l) openMarket(l);
+    if (l) { track("market_switch", { market: l.country }); openMarket(l); } else track("view_open", { view: String(v) });
   };
   // All markets searches only when that view is on screen (not, e.g., when returning to Settings).
   useEffect(() => { if (view === "all") loadAll(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [view]);
@@ -885,12 +933,13 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
   const isSaved = (url: string) => saved.some((s) => s.url === url);
   const toggleSave = (a: Article) => {
     const next = isSaved(a.url) ? saved.filter((s) => s.url !== a.url) : [{ ...a }, ...saved];
+    track(isSaved(a.url) ? "story_unsave" : "story_save", { market: a.country ?? "", topic: a.category, outlet: a.outlet });
     setSaved(next);
     save("wd.saved", next);
     if (!demo) syncAccount({ saved: next });
   };
 
-  const saveAlerts = (next: Alerts) => { setAlerts(next); save("wd.alerts", next); if (!demo) syncAccount({ alerts: next }); };
+  const saveAlerts = (next: Alerts) => { setAlerts(next); save("wd.alerts", next); if (!demo) syncAccount({ alerts: next }); track("alerts_change", { on: next.push }); };
   const firstStory = legs.map((l) => feeds[l.id]?.articles[0]).find(Boolean);
   // Push notification: readable on its own; tapping it opens the market and scrolls to the story.
   const notify = (a: Article | undefined) => {
@@ -939,7 +988,7 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
     const ordered = lead ? [lead, ...list.filter((a) => a !== lead)] : list;
     return ordered.map((a) => (
       <StoryCard key={a.url} a={a === lead ? { ...a, image: leadImage(a) } : a} lead={a === lead} isNew={isNew(a.url)} saved={isSaved(a.url)} onSave={() => toggleSave(a)}
-        onTag={(t) => { if (topicList.includes(t)) setFilter(t); }} onOpen={() => setOpens((n) => n + 1)} />
+        onTag={(t) => { if (topicList.includes(t)) { track("topic_filter", { topic: t }); setFilter(t); } }} onOpen={() => setOpens((n) => n + 1)} />
     ));
   };
   const Chips = ({ onPick, counts }: { onPick: (t: string) => void; counts: (t: string) => number }) => (
@@ -990,7 +1039,7 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
             })}
           </ul>
         </section>
-        <Chips onPick={setFilter} counts={(t) => merged.filter((a) => a.category === t).length} />
+        <Chips onPick={(t) => { track("topic_filter", { topic: t }); setFilter(t); }} counts={(t) => merged.filter((a) => a.category === t).length} />
         {merged.length === 0 && firstLoading && (
           <Progress startedAt={busy[bkey(firstLoading, "top")]} leg={firstLoading} profile={profile} />
         )}
@@ -1008,6 +1057,7 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
     const visible = mine.filter((a) => (filter === "top" ? a.origin === "top" : a.category === filter));
     const newCount = mine.filter((a) => isNew(a.url)).length;
     const pick = (f: string) => {
+      track("topic_filter", { topic: f, market: leg.country });
       setFilter(f);
       if (f !== "top" && !(feed?.fetched.includes(f)) && !busy[bkey(leg, f)]) fetchMore(leg, f);
     };
@@ -1024,7 +1074,7 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
             )}
             {" · "}
             <button className="btn link small" style={{ padding: 0, fontSize: 13 }} disabled={!!busy[bkey(leg, "top")]}
-              onClick={() => { setFilter("top"); fetchMore(leg, "top", true); }}>Refresh</button>
+              onClick={() => { track("refresh", { market: leg.country }); setFilter("top"); fetchMore(leg, "top", true); }}>Refresh</button>
           </p>
         </header>
         <IndicatorStrip country={leg.country} />
@@ -1057,7 +1107,7 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
             {startedAt ? (
               <Progress startedAt={startedAt} leg={leg} profile={profile} topic={filter === "top" ? undefined : filter} compact />
             ) : (
-              <button className="btn ghost" onClick={() => fetchMore(leg, filter)}>Load 5 more {filter === "top" ? "stories" : filter}</button>
+              <button className="btn ghost" onClick={() => { track("load_more", { market: leg.country, topic: filter }); fetchMore(leg, filter); }}>Load 5 more {filter === "top" ? "stories" : filter}</button>
             )}
           </div>
         )}
@@ -1155,7 +1205,7 @@ function BriefingView({ profile, demo, initialView, onEdit, onHome, onLogout, on
           })}
         </nav>
         <div className="sb-foot">
-          <button className={`sb-item sb-feedback ${surveyDone ? "sent" : ""}`} onClick={() => setSurveyReq((n) => n + 1)}>
+          <button className={`sb-item sb-feedback ${surveyDone ? "sent" : ""}`} onClick={() => { track("feedback_open"); setSurveyReq((n) => n + 1); }}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12z" /></svg>
             {surveyDone
               ? <span className="sb-fb">Feedback sent ✓<small>edit answers</small></span>

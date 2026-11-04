@@ -55,6 +55,18 @@ export function ensureSchema() {
     )`;
     await sql`ALTER TABLE survey_responses ADD COLUMN IF NOT EXISTS user_id TEXT`;
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS survey_responses_user ON survey_responses (user_id) WHERE user_id IS NOT NULL`;
+    // One row per action by a signed-in reader; user_id separates readers and session_id separates visits.
+    await sql`CREATE TABLE IF NOT EXISTS usage_events (
+      id BIGSERIAL PRIMARY KEY,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      client_at TIMESTAMPTZ NOT NULL,
+      env TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      session_id TEXT,
+      type TEXT NOT NULL,
+      props JSONB
+    )`;
+    await sql`CREATE INDEX IF NOT EXISTS usage_events_user_time ON usage_events (user_id, client_at)`;
     await sql`CREATE TABLE IF NOT EXISTS briefing_usage (
       ip_hash TEXT NOT NULL,
       day DATE NOT NULL DEFAULT current_date,

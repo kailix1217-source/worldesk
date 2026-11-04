@@ -9,3 +9,6 @@ next-env.d.ts
 .DS_Store
 .claude/
 .env*
+
+# Survey exports contain readers' emails and comments
+worldesk-survey*.csv

@@ -16,17 +16,19 @@ export async function POST(req: Request) {
   try {
     await ensureSchema();
     let [row] = (await sql`SELECT profile, saved, alerts FROM user_data WHERE user_id = ${user.id}`) as Row[];
+    let created = false;
     if (!row) {
       [row] = (await sql`INSERT INTO user_data (user_id, profile, saved, alerts)
         SELECT ${user.id}, ${JSON.stringify(b.profile ?? null)}::jsonb, ${JSON.stringify(b.saved ?? null)}::jsonb, ${JSON.stringify(b.alerts ?? null)}::jsonb
         WHERE (SELECT count(*) FROM user_data WHERE created_day = (now() AT TIME ZONE 'America/Los_Angeles')::date) < ${NEW_ACCOUNTS_PER_DAY}
         ON CONFLICT (user_id) DO NOTHING
         RETURNING profile, saved, alerts`) as Row[];
+      created = !!row;
       // Nothing inserted means the cap is reached, or another request just created this account (a second tab, say).
       if (!row) [row] = (await sql`SELECT profile, saved, alerts FROM user_data WHERE user_id = ${user.id}`) as Row[];
       if (!row) return NextResponse.json({ error: "Worldesk has reached today's limit for new accounts. Please try again tomorrow." }, { status: 403 });
     }
-    return NextResponse.json(row);
+    return NextResponse.json({ ...row, created });
   } catch (e) {
     console.error("account load failed", (e as Error).message);
     return NextResponse.json({ error: "We couldn't open your account. Please try again." }, { status: 500 });

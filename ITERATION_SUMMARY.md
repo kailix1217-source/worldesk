@@ -308,3 +308,19 @@ Added a privacy page, linked from the first page, the sign-in step and the brief
 >
 > email use kailin.xu.2026@marshall.usc.edu. yes. no. also for the market, can you change the UAE option to Mexico? can we deploy it now?
 
+### 34. New headline, story cards and usage tracking
+
+Headline changed to "Know your markets like a local." because the audience is no longer only travelers. Story cards now have a full-width "Read summary" row under the text, the headline also opens the summary, the date moved to the bottom left, and the "sources" label is gone. Added usage tracking for signed-in readers in a new usage_events table: onboarding steps and time, briefing opens, how long stories took to appear, active reading time, and clicks on stories, sources, saves, topics and markets. The server attaches the user ID from the session, so readers are counted once rather than by repeated events. Signed-out visitors and the sample account are not tracked, and only outlet, market and topic are stored for stories. The privacy page now describes this. Then pushed to GitHub and redeployed worldesk.vercel.app.
+
+**Prompt**:
+
+> I also want to change this message because previously it says, "Know the market before you land." It was initially used because our initial product idea was for international business travelers, but now our target audience isn't limited to that audience segment. Please propose three different messages to me.
+>
+> ok go with option 1. Then, I also want to collect some of the data when users are browsing the websites. Please come up with a proposal about what metrics we should collect and how we should collect them through our current database.
+>
+> change the date to the left bottom side of news card. make sure when record the metrics and the activity data, have the user id so we can distinguish them rather than compute repetition. remove the sources label. clickable headline
+>
+> can you change to option b? Full-width row under the card text
+>
+> go with white and ready to deploy
+
