@@ -644,6 +644,9 @@ article.story[data-url] { padding: 24px 26px; margin-top: 18px; }
 /* ---------- v30: in-app feedback survey (invitation, drawer, resume pill) ---------- */
 .btn-google { display: flex; align-items: center; justify-content: center; gap: 10px; }
 .btn-google svg { width: 18px; height: 18px; flex: 0 0 auto; }
+.ob-or { display: flex; align-items: center; gap: 12px; margin: 18px 0 2px; font-size: 13px; color: var(--muted); }
+.ob-or::before, .ob-or::after { content: ""; flex: 1; border-top: 1px solid var(--card-line); }
+.ob-notice { margin: 0 0 12px; font-size: 14px; color: var(--ink); }
 .sb-fb { display: flex; flex-direction: column; line-height: 1.25; }
 .sb-fb small { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.04em; color: var(--muted); }
 .sb-feedback.sent { color: var(--muted); }

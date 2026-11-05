@@ -76,6 +76,7 @@ export default function Home() {
   const [step, setStep] = useState<Step>("welcome");
   const [profile, setProfile] = useState<Profile>(EMPTY_PROFILE);
   const [accountError, setAccountError] = useState("");
+  const [resetToken, setResetToken] = useState("");
   const [signedIn, setSignedIn] = useState(false);
   const [demo, setDemo] = useState(false); // the sample executive never overwrites the user's own account
   // Editing from Settings reuses a setup screen as a single-step editor, then returns to Settings.
@@ -90,15 +91,21 @@ export default function Home() {
     (async () => {
       const local = loadProfile();
       setProfile(local);
-      const justSignedIn = new URLSearchParams(window.location.search).has("signedIn");
+      const params = new URLSearchParams(window.location.search);
+      const justSignedIn = params.has("signedIn");
+      const signInError = params.get("error");
+      const token = params.get("reset") ? params.get("token") : null;
       // Neon finishes the Google sign-in from a one-time value in the address, so tidy the address only after this.
       // A session check that never answers must not leave the reader on a blank page.
       const noSession = new Promise<{ data: null }>((r) => setTimeout(() => r({ data: null }), SESSION_TIMEOUT_MS));
       const { data } = await Promise.race([authClient.getSession().catch(() => ({ data: null })), noSession]);
-      if (justSignedIn) window.history.replaceState(null, "", "/");
+      if (justSignedIn || signInError || params.has("reset")) window.history.replaceState(null, "", "/");
+      if (token) { setResetToken(token); setStep("account"); }
       const user = data?.user;
-      if (justSignedIn && !user) {
-        setAccountError("We couldn't finish signing you in. Please try again.");
+      if ((justSignedIn || signInError) && !user) {
+        setAccountError(signInError === "account_not_linked"
+          ? "That email already has a Worldesk account. Sign in with the button you used before."
+          : "We couldn't finish signing you in. Please try again.");
         setStep("account");
       }
       if (user) {
@@ -198,7 +205,7 @@ export default function Home() {
         </div>
       )}
       {step === "account" && (
-        <AccountStep error={accountError} email={signedIn ? profile.email : ""} onContinue={() => setStep("about")} onSwitch={switchAccount} />
+        <AccountStep error={accountError} email={signedIn ? profile.email : ""} resetToken={resetToken} onContinue={() => setStep("about")} onSwitch={switchAccount} />
       )}
       {step === "about" && (
         <AboutStep profile={profile} setProfile={setProfile} edit={edit} onBack={() => setStep("account")} onNext={() => { stepDone("about"); setStep("markets"); }} />
@@ -399,18 +406,73 @@ function StepHead({ n, title, sub, center, editLabel }: { n: number; title: stri
   );
 }
 
-// Worldesk accounts use Google sign-in only. The same button creates an account or logs back in.
+// Readers sign in with Google, or with an email and password. Google's button creates an account or logs back in;
+// the form below it switches between creating an account, logging in and resetting a password.
 // Step 1 always shows, so a reader who is already signed in can see which account they're using.
-function AccountStep({ error, email, onContinue, onSwitch }: { error: string; email: string; onContinue: () => void; onSwitch: () => void }) {
+const SHORT_PASSWORD = "Use at least 8 characters.";
+// Neon's client can rename the server's error codes (USER_ALREADY_EXISTS becomes user_already_exists),
+// so match on the code in any case and fall back to the server's message.
+const authMessage = (e: { code?: string; status?: number; message?: string }) => {
+  const code = (e.code ?? "").toUpperCase();
+  const text = (e.message ?? "").toLowerCase();
+  if (code.includes("ALREADY_EXISTS") || text.includes("already exists")) return "That email already has an account. Log in instead, or use Google if you signed up that way.";
+  if (code === "INVALID_EMAIL_OR_PASSWORD" || code === "INVALID_CREDENTIALS" || text.includes("invalid email or password")) return "That email or password isn't right. If you signed up with Google, use the Google button.";
+  if (code === "PASSWORD_TOO_SHORT" || code === "WEAK_PASSWORD") return SHORT_PASSWORD;
+  if (code === "INVALID_TOKEN" || code === "BAD_JWT") return "That reset link has expired. Request a new one.";
+  if (e.status === 429 || code === "OVER_REQUEST_RATE_LIMIT") return "Too many attempts. Wait a minute and try again.";
+  return "That didn't work. Please try again.";
+};
+
+function AccountStep({ error, email, resetToken, onContinue, onSwitch }: {
+  error: string; email: string; resetToken: string; onContinue: () => void; onSwitch: () => void;
+}) {
+  const [mode, setMode] = useState<"create" | "login" | "forgot" | "reset">(resetToken ? "reset" : "create");
+  const [name, setName] = useState("");
+  const [address, setAddress] = useState("");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState("");
-  const signIn = async () => {
+  const [notice, setNotice] = useState("");
+  const google = async () => {
     setBusy(true);
     setFailed("");
-    const { error: e } = await authClient.signIn.social({ provider: "google", callbackURL: "/?signedIn=1" })
+    const { error: e } = await authClient.signIn.social({ provider: "google", callbackURL: "/?signedIn=1", errorCallbackURL: "/" })
       .catch(() => ({ error: { message: "" } }));
     if (e) { setFailed("We couldn't reach Google. Please try again."); setBusy(false); }
   };
+  const submit = async (ev: React.FormEvent) => {
+    ev.preventDefault();
+    setFailed("");
+    setNotice("");
+    const addr = address.trim().toLowerCase();
+    if (mode !== "reset" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addr)) { setFailed("Enter a valid email address."); return; }
+    if (mode === "create" && !name.trim()) { setFailed("Enter your name."); return; }
+    if (mode !== "forgot" && password.length < 8) { setFailed(SHORT_PASSWORD); return; }
+    setBusy(true);
+    // Neon's client throws on an error response instead of returning it.
+    const thrown = (x: unknown) => ({ error: x as { code?: string; status?: number; message?: string } });
+    if (mode === "forgot") {
+      const { error: e } = await authClient.requestPasswordReset({ email: addr, redirectTo: "/?reset=1" }).catch(thrown);
+      setBusy(false);
+      if (e) setFailed(authMessage(e)); else setNotice("If that email has an account, a reset link is on its way. Check your spam folder too.");
+      return;
+    }
+    if (mode === "reset") {
+      const { error: e } = await authClient.resetPassword({ newPassword: password, token: resetToken }).catch(thrown);
+      setBusy(false);
+      if (e) { setFailed(authMessage(e)); return; }
+      setPassword("");
+      setMode("login");
+      setNotice("Password updated. Log in with your new password.");
+      return;
+    }
+    const { error: e } = await (mode === "create"
+      ? authClient.signUp.email({ email: addr, password, name: name.trim() })
+      : authClient.signIn.email({ email: addr, password })).catch(thrown);
+    if (e) { setFailed(authMessage(e)); setBusy(false); return; }
+    window.location.assign("/?signedIn=1"); // the page opens the Worldesk account, or stops at the daily limit
+  };
+  const go = (m: typeof mode) => { setMode(m); setFailed(""); setNotice(""); };
   if (email) {
     return (
       <section className="ob ob-narrow">
@@ -422,22 +484,60 @@ function AccountStep({ error, email, onContinue, onSwitch }: { error: string; em
       </section>
     );
   }
+  const heading = mode === "create" ? "Create an account or sign in" : mode === "login" ? "Log in" : mode === "forgot" ? "Reset your password" : "Choose a new password";
+  const action = mode === "create" ? "Create account" : mode === "login" ? "Log in" : mode === "forgot" ? "Send reset link" : "Save new password";
   return (
     <section className="ob ob-narrow">
-      <StepHead n={1} center title="Create an account or sign in" sub="Set up your personalized briefing." />
+      <StepHead n={1} center title={heading} sub="Set up your personalized briefing." />
       <div className="ob-form">
         {(failed || error) && <p className="field-err" role="alert">{failed || error}</p>}
-        <button className="btn ghost ob-full btn-google" disabled={busy} onClick={signIn}>
-          <svg viewBox="0 0 18 18" aria-hidden="true">
+        {notice && <p className="ob-notice" role="status">{notice}</p>}
+        {(mode === "create" || mode === "login") && (
+          <>
+            <button className="btn ghost ob-full btn-google" disabled={busy} onClick={google}>
+              <svg viewBox="0 0 18 18" aria-hidden="true">
             <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z" />
             <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z" />
             <path fill="#FBBC05" d="M3.97 10.72a5.41 5.41 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z" />
             <path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z" />
           </svg>
-          {busy ? "Opening Google…" : "Continue with Google"}
-        </button>
+              Continue with Google
+            </button>
+            <p className="ob-or" aria-hidden="true"><span>or use any email</span></p>
+          </>
+        )}
       </div>
-      <p className="ob-note">Worldesk receives only your name, email and profile picture. It can&apos;t read your Gmail. <a href="/privacy">Privacy</a></p>
+      <form className="ob-form" onSubmit={submit} noValidate>
+        {mode === "create" && (
+          <div className="field">
+            <label htmlFor="acc-name">Full name</label>
+            <input id="acc-name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Doe" />
+          </div>
+        )}
+        {mode !== "reset" && (
+          <div className="field">
+            <label htmlFor="acc-email">Email</label>
+            <input id="acc-email" type="email" autoComplete="email" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="you@company.com" />
+          </div>
+        )}
+        {mode !== "forgot" && (
+          <div className="field">
+            <label htmlFor="acc-pw">{mode === "reset" ? "New password" : "Password"}</label>
+            <input id="acc-pw" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"}
+              value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" />
+          </div>
+        )}
+        <button type="submit" className="btn ob-full" disabled={busy}>{busy ? "One moment…" : action}</button>
+      </form>
+      <p className="ob-switch">
+        {mode === "create" && <>Already have an account? <button className="btn link" onClick={() => go("login")}>Log in</button></>}
+        {mode === "login" && <>
+          <button className="btn link" onClick={() => go("forgot")}>Forgot password?</button>{" · "}
+          <button className="btn link" onClick={() => go("create")}>Create an account</button>
+        </>}
+        {(mode === "forgot" || mode === "reset") && <button className="btn link" onClick={() => go("login")}>Back to log in</button>}
+      </p>
+      <p className="ob-note">With Google, Worldesk receives only your name, email and profile picture, and can&apos;t read your Gmail. <a href="/privacy">Privacy</a></p>
     </section>
   );
 }

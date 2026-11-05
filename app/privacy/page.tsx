@@ -24,8 +24,12 @@ export default function PrivacyPage() {
       </p>
 
       <h2>What we collect</h2>
-      <h3>When you sign in with Google</h3>
-      <p>Your name, email address and profile picture. Worldesk can&apos;t read your Gmail, contacts or files.</p>
+      <h3>When you create an account</h3>
+      <p>
+        With Google: your name, email address and profile picture. Worldesk can&apos;t read your Gmail, contacts or files.
+        With an email and password: your name, email address and password. Neon stores the password in scrambled form, and
+        we can&apos;t see it. We don&apos;t check that you own the email address when you sign up.
+      </p>
       <h3>When you set up your briefing</h3>
       <p>Your job title, function, industry, company if you add it, and the markets, topics and keywords you choose.</p>
       <h3>When you use Worldesk</h3>
@@ -68,8 +72,8 @@ export default function PrivacyPage() {
 
       <h2>Who else handles it</h2>
       <ul>
-        <li><strong>Google</strong> confirms who you are when you sign in.</li>
-        <li><strong>Neon</strong> stores your account and data, on servers in the United States.</li>
+        <li><strong>Google</strong> confirms who you are if you sign in with Google.</li>
+        <li><strong>Neon</strong> stores your account and data, on servers in the United States, and sends password reset emails.</li>
         <li><strong>Vercel</strong> hosts the website and may keep technical logs of requests, including network addresses.</li>
         <li>
           <strong>Perplexity</strong> runs the news searches and the AI model that writes your briefing. It receives your job

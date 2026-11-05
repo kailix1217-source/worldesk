@@ -352,3 +352,17 @@ Survey invite, start and step counts now record the signed-in reader's user ID, 
 >
 > yes. (add the user ID to the survey invite counts, then deploy)
 
+### 38. Email and password accounts
+
+Readers can now create an account with any email and a password, alongside Continue with Google, so work email addresses work without a Google account. The form switches between creating an account, logging in and resetting a password by email. Email ownership is not checked at sign-up, which keeps sign-up instant and avoids blocked verification emails. The privacy page says so. Then pushed to GitHub and redeployed worldesk.vercel.app.
+
+**Prompt**:
+
+> 有没有可能既支持谷歌的 Gmail login，然后也可以支持，比如说用任何 email，就是 work email 也可以？
+>
+> 加Microsoft登陆
+>
+> 可以我觉得就是读者要么选择用自己邮箱要么就是gmail. 但能不能就不要验证码了, 他们直接注册密码呢? 哪个更方便
+>
+> 那个过了.现在先部署吧
+
