@@ -376,3 +376,15 @@ The email boxes on the sign-up step and in the survey now show you@example.com i
 >
 > 部署
 
+### 40. Survey invitation after 10 seconds
+
+The survey invitation now appears 10 seconds after stories show, down from 15, so readers are asked sooner. The clock still waits for stories and pauses while the page is off screen, so nobody is asked to rate a briefing they have not seen. Then pushed to GitHub and redeployed worldesk.vercel.app.
+
+**Prompt**:
+
+> 能不能让问卷出现的时间更快一点, 比如进入briefing page 10s之后就出现
+>
+> B (10 seconds after stories appear)
+>
+> 部署
+

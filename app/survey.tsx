@@ -21,7 +21,7 @@ const metaKey = (demo: boolean) => (demo ? "wd.survey.sample" : "wd.survey");
 const draftKey = (demo: boolean) => `${metaKey(demo)}.draft`;
 const MAX_INVITES = 2;
 const SNOOZE_MS = 24 * 3600_000;
-const INVITE_AFTER_MS = 15_000;
+const INVITE_AFTER_MS = 10_000;
 const STEPS = 5;
 // Rough seconds each step takes, for the "time left" line under the progress bar.
 const STEP_SECONDS = [30, 35, 8, 8, 20];
@@ -95,7 +95,7 @@ export function Survey({ profile, demo, storiesReady, openReq, onDone }: {
     return () => clearInterval(t);
   }, [storiesReady]);
 
-  // Invite after 15 seconds with stories on screen,
+  // Invite after 10 seconds with stories on screen,
   // never while a story is expanded, once per session, at most twice in total.
   useEffect(() => {
     const check = () => {
