@@ -327,7 +327,7 @@ export function Survey({ profile, demo, storiesReady, openReq, onDone }: {
                 <p className="sv-hint">Share any idea the questions above did not cover. Your input will help shape what we build next.</p>
                 <textarea id="sv-idea" rows={4} maxLength={IDEA_MAX} value={a.idea} onChange={(e) => { const idea = e.target.value; setAnswers(() => ({ idea })); }} />
                 <label className="sv-legend" htmlFor="sv-email">{QUESTIONS.email}</label>
-                <input id="sv-email" type="email" autoComplete="email" placeholder="you@company.com" value={a.email}
+                <input id="sv-email" type="email" autoComplete="email" placeholder="you@example.com" value={a.email}
                   onChange={(e) => { const email = e.target.value; setAnswers(() => ({ email })); }} />
                 {!demo && (
                   <label className="check sv-share">

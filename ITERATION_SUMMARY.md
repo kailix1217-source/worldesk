@@ -366,3 +366,13 @@ Readers can now create an account with any email and a password, alongside Conti
 >
 > 那个过了.现在先部署吧
 
+### 39. Neutral email hint
+
+The email boxes on the sign-up step and in the survey now show you@example.com instead of you@company.com, so readers are not nudged toward a work address. Then pushed to GitHub and redeployed worldesk.vercel.app.
+
+**Prompt**:
+
+> 这里提示能不能不要company.有的人说不定不想要companyemail
+>
+> 部署
+

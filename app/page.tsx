@@ -517,7 +517,7 @@ function AccountStep({ error, email, resetToken, onContinue, onSwitch }: {
         {mode !== "reset" && (
           <div className="field">
             <label htmlFor="acc-email">Email</label>
-            <input id="acc-email" type="email" autoComplete="email" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="you@company.com" />
+            <input id="acc-email" type="email" autoComplete="email" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="you@example.com" />
           </div>
         )}
         {mode !== "forgot" && (
